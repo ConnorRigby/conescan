@@ -1,3 +1,9 @@
 [submodule "lib/imgui"]
 	path = lib/imgui
 	url = git@github.com:ocornut/imgui.git
+[submodule "lib/tinyxml2"]
+	path = lib/tinyxml2
+	url = git@github.com:leethomason/tinyxml2.git
+[submodule "lib/nativefiledialog"]
+	path = lib/nativefiledialog
+	url = git@github.com:mlabbe/nativefiledialog.git
