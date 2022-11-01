@@ -1,6 +1,34 @@
 #pragma once
 
+struct Scaling {
+    char* name;
+    char* units;
+    char* toexpr;
+    char* frexpr;
+    char* format;
+    float min;
+    float max;
+    float inc;
+    char* storagetype;
+    char* endian;
+};
+
+struct Table {
+    int level;
+    char* type;
+    bool swapxy;
+    char* name;
+    unsigned long address;
+    int elements;
+    char* category;
+    int numTables;
+    char* scaling;
+    struct Scaling* Scaling;
+    struct Table* tables;
+};
+
 struct Definition {
+    // XML Fields
     char* xmlid;
     unsigned long internalidaddress;
     char* internalidstring;
@@ -14,8 +42,21 @@ struct Definition {
     char* flashmethod;
     char* memmodel;
     char* checksummodule;
+    
+    int numScalings;
+    int numTables;
+    struct Scaling* scalings;
+    struct Table* tables;
 };
 
 void definition_add_value(struct Definition* definition, 
                           const char* fieldName, 
                           const char* value);
+
+void definition_new_scalings(struct Definition* definition);
+
+void definition_scaling_add_string_value(char** field, const char* value);
+
+void definition_new_tables(struct Table** tables, int count);
+
+void definition_deinit(struct Definition* definition);

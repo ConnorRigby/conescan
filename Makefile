@@ -37,6 +37,7 @@ LIBS =
 
 SOURCES += src/conescan.cpp
 SOURCES += src/definition.cpp
+SOURCES += src/console.cpp
 
 ##---------------------------------------------------------------------
 ## OPENGL ES

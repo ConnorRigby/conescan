@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<roms>
+  <rom>
+    <romid>
+      <xmlid>Test Definition</xmlid>
+      <internalidaddress>ffff</internalidaddress>
+      <internalidstring>TestDef</internalidstring>
+      <ecuid>TestECU</ecuid>
+      <market> TestMarket </market>
+      <make>Cone</make>
+      <model>ConeScan</model>
+      <submodel>TestModel</submodel>
+      <transmission>6MT</transmission>
+      <year>1996</year>
+      <flashmethod>uart</flashmethod>
+      <memmodel>CPU42069</memmodel>
+      <checksummodule>TestCheck</checksummodule>
+    </romid>
+    <scaling 
+      name="scaling1" 
+      units="" 
+      toexpr="x" 
+      frexpr="x" 
+      format="%0.2f" 
+      min="0.000" 
+      max="0.000" 
+      inc="1" 
+      storagetype="float" 
+      endian="big" 
+    />
+    <table name="1d test table" address="1234" elements="2" scaling="scaling1" type="1D" />
+
+    <table level="2" type="2D" category="cat 1" swapxy="true" name="test 2d" address="b91f0" elements="3" scaling="scaling1">
+      <table name="2d Y" address="1234" elements="3" scaling="scaling1" type="Y Axis" />
+    </table>
+
+    <table level="3" type="3D" category="cat 1" swapxy="true" name="test 3d" address="b91f1" elements="9" scaling="scaling1">
+      <table name="2d Y" address="1234" elements="3" scaling="scaling1" type="Y Axis" />
+      <table name="2d X" address="5678" elements="4" scaling="scaling1" type="X Axis" />
+    </table>
+
+  </rom>
+</roms>
