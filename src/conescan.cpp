@@ -12,7 +12,7 @@
 char* metadataFilePath = NULL;
 tinyxml2::XMLDocument* metadataFile = NULL;
 static ConeScan::Console console;
-bool console_open = true;
+bool show_console_window = false;
 bool show_demo_window = false;
 struct Definition definition;
 
@@ -259,40 +259,10 @@ void ConeScan::Init()
   memset(&definition, 0, sizeof(struct Definition));
 }
 
-void ConeScan::RenderUI(bool* exit_requested)
+void RenderDefinitionInfo()
 {
-  console.Draw("Console", &console_open);
-  if (ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("File")) {
-      if(metadataFile == NULL) {
-        if (ImGui::MenuItem("Open metadata file", NULL)) {
-          metadataFilePath = getFileOpenPath();
-          if(metadataFilePath) loadMetadataFile();
-        }
-      } else {
-        if (ImGui::MenuItem("close metadata file", NULL)) {
-          closeMetadataFile();
-        }
-      }
-      if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;
-      if(ImGui::MenuItem("Quit", NULL)) *exit_requested = true;
-      ImGui::EndMenu();
-    }
-    ImGui::EndMainMenuBar();
-  }
-
-  if(show_demo_window)
-    ImGui::ShowDemoWindow(&show_demo_window);
-  
-  ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("ROM Info", NULL)) {
-    ImGui::End();
-    return;
-  }
-
   ImVec4 keyColor(0.9f, 0.9f, 0.9f, 1.0f);
   ImVec4 valueColor(0.5f, 0.5f, 0.5f, 1.0f);
-
   if (ImGui::TreeNode("Definition Info")) {
     ImGui::Text("ECU ID: ");
     if(definition.ecuid) {
@@ -368,12 +338,21 @@ void ConeScan::RenderUI(bool* exit_requested)
 
     ImGui::TreePop();
   }
+}
+
+void RenderScalings()
+{
+  ImVec4 valueColor(0.5f, 0.5f, 0.5f, 1.0f);
   if (ImGui::TreeNode("Scalings")) {
     for(int i = 0; i < definition.numScalings; i++) {
       ImGui::TextColored(valueColor, definition.scalings[i].name);
     }
     ImGui::TreePop();
   }
+}
+
+void RenderTables()
+{
   if (ImGui::TreeNode("Tables")) {
     
     for(int i = 0; i < definition.numTables; i++) {
@@ -403,6 +382,48 @@ void ConeScan::RenderUI(bool* exit_requested)
       ImGui::End();
     }
   }
+}
+
+void ConeScan::RenderUI(bool* exit_requested)
+{
+  if(show_console_window)
+    console.Draw("Console", &show_console_window);
+
+  if(show_demo_window)
+    ImGui::ShowDemoWindow(&show_demo_window);
+
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("File")) {
+      if(metadataFile == NULL) {
+        if (ImGui::MenuItem("Open metadata file", NULL)) {
+          metadataFilePath = getFileOpenPath();
+          if(metadataFilePath) loadMetadataFile();
+        }
+      } else {
+        if (ImGui::MenuItem("close metadata file", NULL)) {
+          closeMetadataFile();
+        }
+      }
+      if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;
+      if(ImGui::MenuItem("Show Console", NULL)) show_console_window = true;
+      if(ImGui::MenuItem("Quit", NULL)) *exit_requested = true;
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
+  // Side bar showing Definition info
+  // Scalings
+  // Tables
+  ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Definition Info", NULL)) {
+    ImGui::End();
+    return;
+  }
+
+  RenderDefinitionInfo();
+  RenderScalings();
+  RenderTables();
 
   ImGui::End();
 }
