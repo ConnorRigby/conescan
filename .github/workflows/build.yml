@@ -1,0 +1,68 @@
+name: build
+
+on:
+  push:
+    #
+
+jobs:
+  Emscripten:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Install Dependencies
+        run: |
+          wget -q https://github.com/emscripten-core/emsdk/archive/master.tar.gz
+          tar -xvf master.tar.gz
+          emsdk-master/emsdk update
+          emsdk-master/emsdk install latest
+          emsdk-master/emsdk activate latest
+      - name: Build example_emscripten_opengl3
+        run: |
+          pushd emsdk-master
+          source ./emsdk_env.sh
+          popd
+          make TARGET=wasm
+      - name: Archive artifact
+        shell: bash
+        run: |
+          tar \
+            --dereference --hard-dereference \
+            --directory web \
+            -cvf /tmp/artifact.tar \
+            --exclude=.git \
+            --exclude=.github \
+            .
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: github-pages
+          path: /tmp/artifact.tar
+          retention-days: 7
+
+  deploy:
+    # Add a dependency to the build job
+    needs: Emscripten
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Specify runner + deployment step
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

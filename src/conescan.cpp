@@ -3,7 +3,12 @@
 
 #include "imgui.h"
 #include "tinyxml2.h"
+
+#ifdef WASM
+// nothing to see here
+#else
 #include "nfd.h"
+#endif
 
 #include "conescan.h"
 #include "definition.h"
@@ -18,7 +23,12 @@ struct Definition definition;
 
 bool* tableSelect = NULL;
 
-char* getFileOpenPath()
+char* getFileOpenPath() 
+#ifdef WASM
+{
+  return "/metadata/lfg2ee.xml";
+}
+#else
 {
   nfdchar_t *outPath = NULL;
   nfdchar_t * cwd = NULL;
@@ -35,6 +45,7 @@ char* getFileOpenPath()
   printf("Error: %s\n", NFD_GetError());
   return NULL;
 }
+#endif
 
 void closeMetadataFile() 
 {
