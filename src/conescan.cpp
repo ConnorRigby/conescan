@@ -11,15 +11,18 @@
 #endif
 
 #include "conescan.h"
+#include "conescan_db.h"
 #include "definition.h"
 #include "console.h"
 
+const char* db_path = "conescan.db";
 char* metadataFilePath = NULL;
 tinyxml2::XMLDocument* metadataFile = NULL;
 static ConeScan::Console console;
 bool show_console_window = false;
 bool show_demo_window = false;
 struct Definition definition;
+struct ConeScanDB db;
 
 bool* tableSelect = NULL;
 
@@ -268,6 +271,8 @@ void loadMetadataFile()
 void ConeScan::Init()
 {
   memset(&definition, 0, sizeof(struct Definition));
+  memset(&db, 0, sizeof(struct ConeScanDB));
+  conescan_db_open(&db, db_path);
 }
 
 void RenderDefinitionInfo()

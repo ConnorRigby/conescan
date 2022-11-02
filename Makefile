@@ -20,9 +20,11 @@ TARGET ?= x86_64
 IMGUI_DIR = lib/imgui
 TINYXML2_DIR = lib/tinyxml2
 NATIVEFILEDIALOG_DIR = lib/nativefiledialog
+SQLITE3_DIR = lib/sqlite3
 
 SOURCES = src/main.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
+SOURCES += $(SQLITE3_DIR)/sqlite3.c
 
 ifeq ($(TARGET), x86_64)
 
@@ -70,12 +72,14 @@ CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 CXXFLAGS += -g -Wall -Wformat
 CXXFLAGS += -I$(TINYXML2_DIR)
 CXXFLAGS += -I$(NATIVEFILEDIALOG_DIR)/src/include
+CXXFLAGS += -I$(SQLITE3_DIR)
 CXXFLAGS += -Iinclude
 LIBS =
 
 SOURCES += src/conescan.cpp
 SOURCES += src/definition.cpp
 SOURCES += src/console.cpp
+SOURCES += src/conescan_db.cpp
 
 ##---------------------------------------------------------------------
 ## OPENGL ES
@@ -140,6 +144,9 @@ endif
 
 %.o:src/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+%.o:$(SQLITE3_DIR)/%.c
+	$(CC) $(CXXFLAGS) -c -o $@ $<
 
 %.o:$(IMGUI_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
