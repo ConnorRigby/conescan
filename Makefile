@@ -58,6 +58,7 @@ ifeq ($(USE_FILE_SYSTEM), 1)
 LDFLAGS += --no-heap-copy --preload-file $(IMGUI_DIR)/misc/fonts@/fonts
 LDFLAGS += --no-heap-copy --preload-file lib/metadata@/metadata
 LDFLAGS += --no-heap-copy --preload-file imgui.ini@/imgui.ini
+LDFLAGS += --no-heap-copy --preload-file conescan.db@conescan.db
 endif
 
 LDFLAGS += --shell-file shell_minimal.html $(EMS)
@@ -68,7 +69,7 @@ OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
-CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
+CXXFLAGS =  -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 CXXFLAGS += -g -Wall -Wformat
 CXXFLAGS += -I$(TINYXML2_DIR)
 CXXFLAGS += -I$(NATIVEFILEDIALOG_DIR)/src/include
@@ -144,19 +145,19 @@ endif
 ##---------------------------------------------------------------------
 
 %.o:src/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
 
 %.o:$(SQLITE3_DIR)/%.c
 	$(CC) $(CXXFLAGS) -c -o $@ $<
 
 %.o:$(IMGUI_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
 
 %.o:$(TINYXML2_DIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
 
 %.o:$(IMGUI_DIR)/backends/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
 
 all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
