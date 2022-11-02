@@ -57,7 +57,6 @@ endif
 ifeq ($(USE_FILE_SYSTEM), 1)
 LDFLAGS += --no-heap-copy --preload-file $(IMGUI_DIR)/misc/fonts@/fonts
 LDFLAGS += --no-heap-copy --preload-file lib/metadata@/metadata
-LDFLAGS += --no-heap-copy --preload-file imgui.ini@/imgui.ini
 LDFLAGS += --no-heap-copy --preload-file conescan.db@conescan.db
 endif
 
@@ -82,6 +81,7 @@ SOURCES += src/definition.cpp
 SOURCES += src/console.cpp
 SOURCES += src/conescan_db.cpp
 SOURCES += src/history.cpp
+SOURCES += src/layout.cpp
 
 ##---------------------------------------------------------------------
 ## OPENGL ES

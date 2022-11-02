@@ -157,6 +157,7 @@ int main(int, char**)
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
+    io.IniFilename = NULL;
 #ifdef WASM
     io.IniFilename = "/imgui.ini";
     // Setup Platform/Renderer backends

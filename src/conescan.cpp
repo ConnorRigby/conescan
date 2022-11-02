@@ -15,6 +15,7 @@
 #include "history.h"
 #include "definition.h"
 #include "console.h"
+#include "layout.h"
 
 const char* db_path = "conescan.db";
 char* metadataFilePath = NULL;
@@ -33,6 +34,10 @@ int historyCount = 0;
 int pathHistoryMax = 5;
 char **pathHistory;
 
+// for saving/loading layout
+const char *iniData = NULL;
+size_t iniSize = 0;
+
 char* getFileOpenPath() 
 #ifdef WASM
 {
@@ -41,9 +46,7 @@ char* getFileOpenPath()
 #else
 {
   nfdchar_t *outPath = NULL;
-  nfdchar_t * cwd = NULL;
-  getcwd(cwd,255);
-  nfdresult_t result = NFD_OpenDialog(NULL, cwd, &outPath);
+  nfdresult_t result = NFD_OpenDialog(NULL, NULL, &outPath);
       
   if (result == NFD_OKAY) {
     return outPath;
@@ -271,6 +274,13 @@ void ConeScan::Init()
   memset(&definition, 0, sizeof(struct Definition));
   memset(&db, 0, sizeof(struct ConeScanDB));
   conescan_db_open(&db, db_path);
+
+  iniSize = conescan_db_load_layout(&db, 1, &iniData);
+  if(iniSize) {
+    console.AddLog("Loading layout 1");
+    ImGui::LoadIniSettingsFromMemory(iniData, iniSize);
+  }
+
   pathHistory = (char**)malloc((sizeof(char*) * pathHistoryMax));
   assert(pathHistory);
   memset(pathHistory, 0, sizeof(char*) * pathHistoryMax);
@@ -423,8 +433,18 @@ void ConeScan::RenderUI(bool* exit_requested)
 
       if(metadataFile == NULL) {
         if (ImGui::MenuItem("Open metadata file", NULL)) {
-          metadataFilePath = getFileOpenPath();
-          if(metadataFilePath) loadMetadataFile();
+          char* tmp = getFileOpenPath();
+          if(tmp) {
+            int len = strlen(tmp);
+            if(len > 0) {
+              metadataFilePath = (char*)malloc(len+1);
+              assert(metadataFilePath);
+              memset(metadataFilePath, 0 , len+1);
+              strncpy(metadataFilePath, tmp, len);
+            }
+            free(tmp);
+            loadMetadataFile();
+          } 
         }
       } else {
         if (ImGui::MenuItem("close metadata file", NULL)) {
@@ -439,13 +459,18 @@ void ConeScan::RenderUI(bool* exit_requested)
         assert(pathHistory[i]);
         if(ImGui::MenuItem(pathHistory[i], NULL)) {
           if(metadataFile) closeMetadataFile();
-          if(metadataFilePath) metadataFilePath = NULL;
-
-          metadataFilePath = (char*)malloc(strlen(pathHistory[i]));
-          assert(metadataFilePath);
-          memset(metadataFilePath, 0, strlen(pathHistory[i]));
-          strcpy(metadataFilePath, pathHistory[i]);
-          loadMetadataFile();
+          if(metadataFilePath) {
+            free(metadataFilePath);
+            metadataFilePath = NULL;
+          }
+          int len = strlen(pathHistory[i]);
+          if(len > 0) {
+            metadataFilePath = (char*)malloc(len + 1);
+            assert(metadataFilePath);
+            memset(metadataFilePath, 0, len+1);
+            strncpy(metadataFilePath, pathHistory[i], len);
+            loadMetadataFile();
+          }
         }
       }
       ImGui::Separator();
@@ -478,5 +503,14 @@ void ConeScan::RenderUI(bool* exit_requested)
 void ConeScan::Cleanup()
 {
   closeMetadataFile();
+  int layoutID = 0;
+  if(iniData) {
+    // if ini data was loaded, assume we are using layout 1 for now
+    layoutID = 1;
+    free((char*)iniData);
+  }
+  iniData = ImGui::SaveIniSettingsToMemory(&iniSize);
+  conescan_db_save_layout(&db, layoutID, iniData);
+
   conescan_db_close(&db);
 }

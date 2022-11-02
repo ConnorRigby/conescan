@@ -113,7 +113,6 @@ void definition_new_tables(struct Table** tables, int count)
 
 void definition_deinit(struct Definition* definition)
 {
-
   if(definition->xmlid) {
     free(definition->xmlid);
     definition->xmlid = NULL;
@@ -163,9 +162,79 @@ void definition_deinit(struct Definition* definition)
     definition->checksummodule = NULL;
   }
 
+  if(definition->scalings) {
+    for(int i = 0; i < definition->numScalings; i++) {
+      if(definition->scalings[i].endian) {
+        free(definition->scalings[i].endian);
+        definition->scalings[i].endian = NULL;
+      }
+      if(definition->scalings[i].format) {
+        free(definition->scalings[i].format);
+        definition->scalings[i].format = NULL;
+      }
+      if(definition->scalings[i].frexpr) {
+        free(definition->scalings[i].frexpr);
+        definition->scalings[i].frexpr = NULL;
+      }
+      if(definition->scalings[i].name) {
+        free(definition->scalings[i].name);
+        definition->scalings[i].name = NULL;
+      }
+      if(definition->scalings[i].storagetype) {
+        free(definition->scalings[i].storagetype);
+        definition->scalings[i].storagetype = NULL;
+      }
+      if(definition->scalings[i].toexpr) {
+        free(definition->scalings[i].toexpr);
+        definition->scalings[i].toexpr = NULL;
+      }
+      if(definition->scalings[i].units) {
+        free(definition->scalings[i].units);
+        definition->scalings[i].units = NULL;
+      }
+    }
+    free(definition->scalings);
+    definition->scalings = NULL;
+  }
+
   if(definition->tables) {
     for(int i = 0; i < definition->numTables; i++) {
+      if(definition->tables[i].category) {
+        free(definition->tables[i].category);
+        definition->tables[i].category = NULL;
+      }
+      if(definition->tables[i].name) {
+        free(definition->tables[i].name);
+        definition->tables[i].name = NULL;
+      }
+      if(definition->tables[i].type) {
+        free(definition->tables[i].type);
+        definition->tables[i].type = NULL;
+      }
+      if(definition->tables[i].scaling) {
+        free(definition->tables[i].scaling);
+        definition->tables[i].scaling = NULL;
+      }
+
       if(definition->tables[i].tables) {
+        for(int j = 0; j < definition->tables[i].numTables; j++) {
+          if(definition->tables[i].tables[j].category) {
+            free(definition->tables[i].tables[j].category);
+            definition->tables[i].tables[j].category = NULL;
+          }
+          if(definition->tables[i].tables[j].name) {
+            free(definition->tables[i].tables[j].name);
+            definition->tables[i].tables[j].name = NULL;
+          }
+          if(definition->tables[i].tables[j].type) {
+            free(definition->tables[i].tables[j].type);
+            definition->tables[i].tables[j].type = NULL;
+          }
+          if(definition->tables[i].tables[j].scaling) {
+            free(definition->tables[i].tables[j].scaling);
+            definition->tables[i].tables[j].scaling = NULL;
+          }
+        }
         free(definition->tables[i].tables);
         definition->tables[i].tables = NULL;
       }
