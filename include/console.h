@@ -1,5 +1,7 @@
 #pragma once
 
+#include "conescan_db.h"
+
 namespace ConeScan {
   struct Console {
       char                  InputBuf[256];
@@ -10,6 +12,7 @@ namespace ConeScan {
       ImGuiTextFilter       Filter;
       bool                  AutoScroll;
       bool                  ScrollToBottom;
+      struct ConeScanDB*    db;
       Console();
       ~Console();
       static int   Stricmp(const char* s1, const char* s2);         
@@ -22,5 +25,6 @@ namespace ConeScan {
       void    ExecCommand(const char* command_line);
       static int TextEditCallbackStub(ImGuiInputTextCallbackData* data);
       int     TextEditCallback(ImGuiInputTextCallbackData* data);
+      void RegisterDB(struct ConeScanDB* db);
   };
 }

@@ -35,6 +35,10 @@ namespace ConeScan {
         for (int i = 0; i < History.Size; i++)
             free(History[i]);
     }
+    void Console::RegisterDB(struct ConeScanDB* db_)
+    {
+        db = db_;
+    }
 
     void    Console::ClearLog()
     {
@@ -169,8 +173,7 @@ namespace ConeScan {
             ImGui::PopStyleVar();
         }
         ImGui::EndChild();
-        // ImGui::Separator();
-/*
+        ImGui::Separator();
         // Command-line
         bool reclaim_focus = false;
         ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
@@ -188,7 +191,6 @@ namespace ConeScan {
         ImGui::SetItemDefaultFocus();
         if (reclaim_focus)
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
-*/
         ImGui::End();
     }
 
@@ -227,6 +229,7 @@ namespace ConeScan {
         }
         else
         {
+            // TODO: implement DB access here
             AddLog("Unknown command: '%s'\n", command_line);
         }
 

@@ -104,7 +104,6 @@ void definition_new_tables(struct Table** tables, int count)
     return;
   }
   if(count <= 0) {
-    printf("not making new tables\n");
     // *tables = NULL;
     return;
   }

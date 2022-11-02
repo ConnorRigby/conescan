@@ -12,6 +12,7 @@
 
 #include "conescan.h"
 #include "conescan_db.h"
+#include "history.h"
 #include "definition.h"
 #include "console.h"
 
@@ -19,12 +20,18 @@ const char* db_path = "conescan.db";
 char* metadataFilePath = NULL;
 tinyxml2::XMLDocument* metadataFile = NULL;
 static ConeScan::Console console;
-bool show_console_window = false;
+bool show_console_window = true;
 bool show_demo_window = false;
 struct Definition definition;
 struct ConeScanDB db;
 
+// stores opened table editors
 bool* tableSelect = NULL;
+
+// set by the db history API
+int historyCount = 0;
+int pathHistoryMax = 5;
+char **pathHistory;
 
 char* getFileOpenPath() 
 #ifdef WASM
@@ -62,6 +69,7 @@ void closeMetadataFile()
   }
   definition_deinit(&definition);
   memset(&definition, 0, sizeof(struct Definition));
+  console.AddLog("Closed metadata");
 }
 
 void loadScaling(struct Scaling* scaling, tinyxml2::XMLElement * xml)
@@ -120,7 +128,6 @@ void loadScalings(tinyxml2::XMLNode *rom)
     scaling = scaling->NextSiblingElement("scaling");
   }
   console.AddLog("Processing %d scalings", definition.numScalings);
-  printf("Processing %d scalings\n", definition.numScalings);
   definition_new_scalings(&definition);
 
   scaling = rom->FirstChildElement("scaling");
@@ -132,19 +139,6 @@ void loadScalings(tinyxml2::XMLNode *rom)
     }
     loadScaling(&definition.scalings[index], scaling);
 
-    console.AddLog("scaling name=%s units=%s toexpr=%s frexpr=%s format=%s storagetype=%s endian=%s min=%f max=%f inc=%finc", 
-      definition.scalings[index].name,
-      definition.scalings[index].units,
-      definition.scalings[index].toexpr,
-      definition.scalings[index].frexpr,
-      definition.scalings[index].format,
-      definition.scalings[index].storagetype,
-      definition.scalings[index].endian,
-      definition.scalings[index].min,
-      definition.scalings[index].max,
-      definition.scalings[index].inc
-    );
-
     scaling = scaling->NextSiblingElement("scaling");
     index+=1;
   }
@@ -152,7 +146,6 @@ void loadScalings(tinyxml2::XMLNode *rom)
 
 void loadTable(struct Table* table, tinyxml2::XMLElement *xml)
 {
-  printf("loading table %p\n", table);
   if(table == NULL) return;
   if(xml == NULL) return;
   table->level = xml->IntAttribute("level");
@@ -160,8 +153,6 @@ void loadTable(struct Table* table, tinyxml2::XMLElement *xml)
   definition_scaling_add_string_value(&table->name, xml->Attribute("name"));
   definition_scaling_add_string_value(&table->category, xml->Attribute("category"));
   definition_scaling_add_string_value(&table->scaling, xml->Attribute("scaling"));
-  printf("loaded table %s\n", table->name);
-  // table->address = xml->Int64Attribute("address");
 }
 
 void loadTables(tinyxml2::XMLNode *rom)
@@ -176,7 +167,6 @@ void loadTables(tinyxml2::XMLNode *rom)
     table = table->NextSiblingElement("table");
   }
   console.AddLog("Processing %d tables", definition.numTables);
-  printf("Processing %d tables\n", definition.numTables);
   definition_new_tables(&definition.tables, definition.numTables);
   if(tableSelect) {
     free(tableSelect);
@@ -198,8 +188,6 @@ void loadTables(tinyxml2::XMLNode *rom)
       definition.tables[index].numTables+=1;
       Subtable = Subtable->NextSiblingElement("table");
     }
-    console.AddLog("table has %d sub tables", definition.tables[index].numTables);
-    printf("table has %d sub tables\n", definition.tables[index].numTables);
     definition_new_tables(&definition.tables[index].tables, definition.tables[index].numTables);
 
     table = table->NextSiblingElement("table");
@@ -266,6 +254,16 @@ void loadMetadataFile()
     loadScalings(rom);
     loadTables(rom);
   }
+  bool addToHistory = true;
+  for(int i = 0; i < historyCount; i++) {
+    if(strcmp(pathHistory[i], metadataFilePath) == 0)
+      addToHistory = false;
+  }
+  if(addToHistory) {
+    conescan_db_add_history(&db, "Definition", metadataFilePath);
+    conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
+    console.AddLog("added entry to history%s", metadataFilePath);
+  }  
 }
 
 void ConeScan::Init()
@@ -273,6 +271,17 @@ void ConeScan::Init()
   memset(&definition, 0, sizeof(struct Definition));
   memset(&db, 0, sizeof(struct ConeScanDB));
   conescan_db_open(&db, db_path);
+  pathHistory = (char**)malloc((sizeof(char*) * pathHistoryMax));
+  assert(pathHistory);
+  memset(pathHistory, 0, sizeof(char*) * pathHistoryMax);
+  for(int i = 0; i < pathHistoryMax; i++) {
+    pathHistory[i] = (char*)malloc(sizeof(char) * 255);
+    assert(pathHistory[i]);
+    memset(pathHistory[i], 0, sizeof(char) * 255);
+  }
+  conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
+  console.RegisterDB(&db);
+  console.AddLog("Loaded definition history");
 }
 
 void RenderDefinitionInfo()
@@ -410,6 +419,8 @@ void ConeScan::RenderUI(bool* exit_requested)
 
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
+      ImGui::MenuItem("Load Definition", NULL, false, false);
+
       if(metadataFile == NULL) {
         if (ImGui::MenuItem("Open metadata file", NULL)) {
           metadataFilePath = getFileOpenPath();
@@ -420,6 +431,25 @@ void ConeScan::RenderUI(bool* exit_requested)
           closeMetadataFile();
         }
       }
+      ImGui::Separator();
+      
+      ImGui::MenuItem("Definition History", NULL, false, false);
+
+      for(int i = 0; i < historyCount; i++) {
+        assert(pathHistory[i]);
+        if(ImGui::MenuItem(pathHistory[i], NULL)) {
+          if(metadataFile) closeMetadataFile();
+          if(metadataFilePath) metadataFilePath = NULL;
+
+          metadataFilePath = (char*)malloc(strlen(pathHistory[i]));
+          assert(metadataFilePath);
+          memset(metadataFilePath, 0, strlen(pathHistory[i]));
+          strcpy(metadataFilePath, pathHistory[i]);
+          loadMetadataFile();
+        }
+      }
+      ImGui::Separator();
+
       if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;
       if(ImGui::MenuItem("Show Console", NULL)) show_console_window = true;
       if(ImGui::MenuItem("Quit", NULL)) *exit_requested = true;
@@ -448,4 +478,5 @@ void ConeScan::RenderUI(bool* exit_requested)
 void ConeScan::Cleanup()
 {
   closeMetadataFile();
+  conescan_db_close(&db);
 }

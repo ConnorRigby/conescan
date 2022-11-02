@@ -80,6 +80,7 @@ SOURCES += src/conescan.cpp
 SOURCES += src/definition.cpp
 SOURCES += src/console.cpp
 SOURCES += src/conescan_db.cpp
+SOURCES += src/history.cpp
 
 ##---------------------------------------------------------------------
 ## OPENGL ES

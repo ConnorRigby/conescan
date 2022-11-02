@@ -6,3 +6,4 @@ struct ConeScanDB {
 };
 
 void conescan_db_open(struct ConeScanDB* db, const char* path);
+void conescan_db_close(struct ConeScanDB* db);
