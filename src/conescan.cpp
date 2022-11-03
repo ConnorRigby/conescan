@@ -6,6 +6,7 @@
 
 #ifdef WASM
 // nothing to see here
+#include "emscripten.h"
 #else
 #include "nfd.h"
 #endif
@@ -17,7 +18,12 @@
 #include "console.h"
 #include "layout.h"
 
+#ifdef WASM
+const char* db_path = "/conescan/conescan.db";
+#else
 const char* db_path = "conescan.db";
+#endif
+
 char* metadataFilePath = NULL;
 tinyxml2::XMLDocument* metadataFile = NULL;
 static ConeScan::Console console;
@@ -266,6 +272,7 @@ void loadMetadataFile()
     conescan_db_add_history(&db, "Definition", metadataFilePath);
     conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
     console.AddLog("added entry to history%s", metadataFilePath);
+    assert(sqlite3_db_cacheflush(db.db) == SQLITE_OK);
   }  
 }
 
@@ -274,6 +281,7 @@ void ConeScan::Init()
   memset(&definition, 0, sizeof(struct Definition));
   memset(&db, 0, sizeof(struct ConeScanDB));
   conescan_db_open(&db, db_path);
+  console.AddLog("loaded database %s", db_path);
 
   iniSize = conescan_db_load_layout(&db, 1, &iniData);
   if(iniSize) {
@@ -498,7 +506,6 @@ void ConeScan::RenderUI(bool* exit_requested)
 
   ImGui::End();
 }
-
 
 void ConeScan::Cleanup()
 {

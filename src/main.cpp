@@ -55,9 +55,95 @@ static void glfw_error_callback(int error, const char* description)
 
 #endif // WASM
 
+#include <unistd.h>
+#include <stdio.h>
+int
+copy_file(char* path_to_read_file, char* path_to_write_file)
+{
+    char chr;
+    FILE *stream_for_write, *stream_for_read;
+
+    if ((stream_for_write = fopen(path_to_write_file, "w")) == NULL) {
+        fprintf(stderr, "%s: %s\n", "Impossible to create a file", path_to_write_file);
+        return -1;
+    }
+
+    if ((stream_for_read = fopen(path_to_read_file, "r")) == NULL) {
+        fprintf(stderr, "%s: %s\n", "Impossible to read a file", path_to_read_file);
+        return -1;
+    }
+
+    while ((chr = fgetc(stream_for_read)) != EOF)
+        fputc(chr, stream_for_write);
+
+    fclose(stream_for_write);
+    fclose(stream_for_read);
+
+    return 0;
+}
+
 int main(int, char**)
 {
-#ifdef WASM
+#ifdef WASM    // EM_ASM is a macro to call in-line JavaScript code.
+    EM_ASM(
+        // Make a directory other than '/'
+        FS.mkdir('/conescan');
+        // Then mount with IDBFS type
+        FS.mount(IDBFS, {}, '/conescan');
+
+        // Then sync
+        FS.syncfs(true, function (err) {
+            // Error
+            assert(!err);
+        });
+    );
+    printf("synced fs\n");
+
+    char c[] = "this is tutorialspoint";
+    if(access("/conescan/file.txt", F_OK) == 0)  {
+        printf("file exists!\n");
+        FILE *fp;
+        char buffer[100];
+        printf("reading file\n");
+        fp = fopen("/conescan/file.txt", "r");
+        assert("fp");
+        fread(buffer, strlen(c)+1, 1, fp);
+        printf("%s\n", buffer);
+        fclose(fp);
+
+    } else {
+        printf("file does not exist\n");
+        FILE *fp;
+        char buffer[100];
+
+        /* Open file for both reading and writing */
+        printf("opening file for write\n");
+        fp = fopen("/conescan/file.txt", "w+");
+        assert(fp);
+
+        /* Write data to the file */
+        fwrite(c, strlen(c) + 1, 1, fp);
+        printf("wrote file");
+        // fsync(fp);
+        fclose(fp);
+        // sync();
+        EM_ASM(
+            // Then sync
+            FS.syncfs(function (err) {
+                // Error
+                assert(!err);
+            });
+        );
+    }
+    return 0;
+    printf("not found db\n");
+    if (access("/conescan/conescan.db", F_OK) == 0) {
+        // fwrite(testFile, )
+    } else {
+        printf("copying default db\n");
+        // file doesn't exist
+        // copy_file("/conescan.db", "/conescan/conescan.db");
+    }
 
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
@@ -159,7 +245,8 @@ int main(int, char**)
     }
     io.IniFilename = NULL;
 #ifdef WASM
-    io.IniFilename = "/imgui.ini";
+    // io.IniFilename = "/imgui.ini";
+    io.IniFilename = "/conescan/imgui.ini";
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForOpenGL(g_Window, g_GLContext);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -191,7 +278,7 @@ int main(int, char**)
     // This function will directly return and exit the main function.
     // Make sure that no required objects get cleaned up.
     // This way we can use the browsers 'requestAnimationFrame' to control the rendering.
-    emscripten_set_main_loop(main_loop, 60, true);
+    emscripten_set_main_loop(main_loop, 0, true);
 #else
     // Our state
     // bool show_demo_window = true;
@@ -294,6 +381,21 @@ static void main_loop(void)
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SDL_GL_SwapWindow(g_Window);
+    if(should_exit) {
+        printf("syncing FS");
+        sync();
+        // EM_ASM(
+        //     console.log("syncing FS");
+        //     FS.syncfs(true, function (err) {
+        //         // Error
+        //         console.dir({err: err});
+        //     });
+        //     console.log("synced FS");
+        // );
+        printf("synced FS");
+        ConeScan::Cleanup();
+        SDL_Quit();
+    }
 }
 
 #endif

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"/>
-    <title>Dear ImGui Emscripten example</title>
+    <title>ConeScan Web Viewer</title>
     <style>
         body { margin: 0; background-color: black }
         .emscripten {
@@ -30,6 +30,20 @@
   <body>
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     <script type='text/javascript'>
+      console.log("requesting storage");
+      if(!navigator.storage) {
+        console.log("navigator.storage = null");
+      }
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then((persistent) => {
+          if (persistent) {
+            console.log("Storage will not be cleared except by explicit user action");
+          } else {
+            console.log("Storage may be cleared by the UA under storage pressure.");
+          }
+        });
+      }
+
       var Module = {
         preRun: [],
         postRun: [],
@@ -56,7 +70,7 @@
         }
       };
       window.onerror = function() {
-        console.log("onerror: " + event);
+        console.dir(event);
       };
     </script>
     {{{ SCRIPT }}}

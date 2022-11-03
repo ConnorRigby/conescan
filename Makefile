@@ -43,7 +43,8 @@ EXE = $(WEB_DIR)/index.html
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 EMS += -s USE_SDL=2
 EMS += -s DISABLE_EXCEPTION_CATCHING=1
-LDFLAGS += -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s NO_EXIT_RUNTIME=0 -s ASSERTIONS=1
+EMS += -g3
+LDFLAGS += -lidbfs.js -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s NO_EXIT_RUNTIME=0 -s ASSERTIONS=1
 
 # Emscripten allows preloading a file or folder to be accessible at runtime.
 # The Makefile for this example project suggests embedding the misc/fonts/ folder into our application, it will then be accessible as "/fonts"
@@ -51,6 +52,7 @@ LDFLAGS += -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s NO_EXIT_RUNTIME=0 -s ASSERTIONS
 # (Default value is 0. Set to 1 to enable file-system and include the misc/fonts/ folder as part of the build.)
 USE_FILE_SYSTEM ?= 1
 ifeq ($(USE_FILE_SYSTEM), 0)
+$(error Invalid config)
 LDFLAGS += -s NO_FILESYSTEM=1
 CPPFLAGS += -DIMGUI_DISABLE_FILE_FUNCTIONS
 endif
