@@ -4,7 +4,7 @@
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
 #include "imgui.h"
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
@@ -24,11 +24,11 @@
 #endif
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-#endif // WASM
+#endif // __EMSCRIPTEN__
 
 #include "conescan.h"
 
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 
 // Emscripten requires to have full control over the main loop. We're going to store our SDL book-keeping variables globally.
 // Having a single function that acts as a loop prevents us to store state in the stack of said function. So we need some location for this.
@@ -38,6 +38,28 @@ bool should_exit = false;
 
 // For clarity, our main loop code is declared at the end.
 static void main_loop(void);
+
+EM_ASYNC_JS(int, mount_fs, (), {
+    // Make a directory other than '/'
+    FS.mkdir('/conescan');
+    // Then mount with IDBFS type
+    FS.mount(IDBFS, {}, '/conescan');
+
+    // Then sync
+    FS.syncfs(true, function (err) {
+        assert(!err);
+    });
+    return 0;
+});
+
+EM_ASYNC_JS(int, sync_fs, (), {
+    console.log("syncing FS before exit");
+    FS.syncfs(function (err) {
+        // Error
+        console.dir({err: err});
+    });
+    console.log("synced FS");
+});
 
 #else
 
@@ -53,12 +75,11 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-#endif // WASM
+#endif // __EMSCRIPTEN__
 
 #include <unistd.h>
 #include <stdio.h>
-int
-copy_file(char* path_to_read_file, char* path_to_write_file)
+int copy_file(const char* path_to_read_file, const char* path_to_write_file)
 {
     char chr;
     FILE *stream_for_write, *stream_for_read;
@@ -84,68 +105,20 @@ copy_file(char* path_to_read_file, char* path_to_write_file)
 
 int main(int, char**)
 {
-#ifdef WASM    // EM_ASM is a macro to call in-line JavaScript code.
-    EM_ASM(
-        // Make a directory other than '/'
-        FS.mkdir('/conescan');
-        // Then mount with IDBFS type
-        FS.mount(IDBFS, {}, '/conescan');
-
-        // Then sync
-        FS.syncfs(true, function (err) {
-            // Error
-            assert(!err);
-        });
-    );
+#ifdef __EMSCRIPTEN__
+    mount_fs();
     printf("synced fs\n");
 
-    char c[] = "this is tutorialspoint";
-    if(access("/conescan/file.txt", F_OK) == 0)  {
-        printf("file exists!\n");
-        FILE *fp;
-        char buffer[100];
-        printf("reading file\n");
-        fp = fopen("/conescan/file.txt", "r");
-        assert("fp");
-        fread(buffer, strlen(c)+1, 1, fp);
-        printf("%s\n", buffer);
-        fclose(fp);
-
-    } else {
-        printf("file does not exist\n");
-        FILE *fp;
-        char buffer[100];
-
-        /* Open file for both reading and writing */
-        printf("opening file for write\n");
-        fp = fopen("/conescan/file.txt", "w+");
-        assert(fp);
-
-        /* Write data to the file */
-        fwrite(c, strlen(c) + 1, 1, fp);
-        printf("wrote file");
-        // fsync(fp);
-        fclose(fp);
-        // sync();
-        EM_ASM(
-            // Then sync
-            FS.syncfs(function (err) {
-                // Error
-                assert(!err);
-            });
-        );
-    }
-    return 0;
-    printf("not found db\n");
+    printf("checking for DB \n");
     if (access("/conescan/conescan.db", F_OK) == 0) {
-        // fwrite(testFile, )
+        printf("found local database\n");
     } else {
         printf("copying default db\n");
-        // file doesn't exist
-        // copy_file("/conescan.db", "/conescan/conescan.db");
+        copy_file("/conescan.db", "/conescan/conescan.db");
     }
 
     // Setup SDL
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_ASYNCIFY, "0");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
     {
         printf("Error: %s\n", SDL_GetError());
@@ -244,9 +217,9 @@ int main(int, char**)
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
     io.IniFilename = NULL;
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
     // io.IniFilename = "/imgui.ini";
-    io.IniFilename = "/conescan/imgui.ini";
+    // io.IniFilename = "/conescan/imgui.ini";
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForOpenGL(g_Window, g_GLContext);
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -274,7 +247,7 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 #endif
     ConeScan::Init();
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
     // This function will directly return and exit the main function.
     // Make sure that no required objects get cleaned up.
     // This way we can use the browsers 'requestAnimationFrame' to control the rendering.
@@ -339,19 +312,17 @@ int main(int, char**)
 
     glfwDestroyWindow(window);
     glfwTerminate();
-#endif // wasm
+#endif // __EMSCRIPTEN__
     return 0;
 }
 
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 static void main_loop(void)
 {
     ImGuiIO& io = ImGui::GetIO();
     //IM_UNUSED(arg); // We can pass this argument as the second parameter of emscripten_set_main_loop_arg(), but we don't use that.
 
     // Our state (make them static = more or less global) as a convenience to keep the example terse.
-    static bool show_demo_window = true;
-    static bool show_another_window = false;
     static ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Poll and handle events (inputs, window resize, etc.)
@@ -383,15 +354,8 @@ static void main_loop(void)
     SDL_GL_SwapWindow(g_Window);
     if(should_exit) {
         printf("syncing FS");
-        sync();
-        // EM_ASM(
-        //     console.log("syncing FS");
-        //     FS.syncfs(true, function (err) {
-        //         // Error
-        //         console.dir({err: err});
-        //     });
-        //     console.log("synced FS");
-        // );
+        sync_fs();
+        // emscripten_sleep(5000);
         printf("synced FS");
         ConeScan::Cleanup();
         SDL_Quit();

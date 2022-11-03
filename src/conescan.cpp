@@ -222,7 +222,7 @@ void loadTables(tinyxml2::XMLNode *rom)
   }
 }
 
-void loadMetadataFile() 
+void loadMetadataFile(void) 
 {
   if(metadataFilePath == NULL) {
     if(metadataFile) delete metadataFile;
@@ -232,11 +232,14 @@ void loadMetadataFile()
   if(metadataFile == NULL) {
     metadataFile = new tinyxml2::XMLDocument();
   }
+  printf("loading definition file %s\n", metadataFilePath);
+  console.AddLog("loading definition file %s\n", metadataFilePath);
   if(metadataFile->LoadFile(metadataFilePath) != tinyxml2::XML_SUCCESS) {
     console.AddLog("Failed to open metadata file %s\n", metadataFile->ErrorStr());
     closeMetadataFile();
     return;
   }
+  printf("opened definition file %s\n", metadataFilePath);
   console.AddLog("Opened %s\n", metadataFilePath);
   tinyxml2::XMLElement *def;
   def = metadataFile->RootElement();
@@ -269,7 +272,9 @@ void loadMetadataFile()
       addToHistory = false;
   }
   if(addToHistory) {
+    printf("adding %s to history\n", metadataFilePath);
     conescan_db_add_history(&db, "Definition", metadataFilePath);
+    printf("added %s to history\n", metadataFilePath);
     conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
     console.AddLog("added entry to history%s", metadataFilePath);
     assert(sqlite3_db_cacheflush(db.db) == SQLITE_OK);
@@ -509,6 +514,7 @@ void ConeScan::RenderUI(bool* exit_requested)
 
 void ConeScan::Cleanup()
 {
+  printf("starting cleanup\n");
   closeMetadataFile();
   int layoutID = 0;
   if(iniData) {

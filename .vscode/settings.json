@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.lua": "lua",
+    "cmath": "cpp",
+    "complex": "cpp",
+    "functional": "cpp"
+  }
+}

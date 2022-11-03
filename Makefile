@@ -42,9 +42,10 @@ EXE = $(WEB_DIR)/index.html
 
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
 EMS += -s USE_SDL=2
-EMS += -s DISABLE_EXCEPTION_CATCHING=1
-EMS += -g3
-LDFLAGS += -lidbfs.js -s WASM=1 -s ALLOW_MEMORY_GROWTH=1 -s NO_EXIT_RUNTIME=0 -s ASSERTIONS=1
+# EMS += -s DISABLE_EXCEPTION_CATCHING=1
+# EMS += -g3
+# EMS += -sASYNCIFY_IGNORE_INDIRECT
+LDFLAGS += -lidbfs.js -s ALLOW_MEMORY_GROWTH=1 -s EXIT_RUNTIME=1 -s ASSERTIONS=1 -sASYNCIFY
 
 # Emscripten allows preloading a file or folder to be accessible at runtime.
 # The Makefile for this example project suggests embedding the misc/fonts/ folder into our application, it will then be accessible as "/fonts"
@@ -57,9 +58,9 @@ LDFLAGS += -s NO_FILESYSTEM=1
 CPPFLAGS += -DIMGUI_DISABLE_FILE_FUNCTIONS
 endif
 ifeq ($(USE_FILE_SYSTEM), 1)
-LDFLAGS += --no-heap-copy --preload-file $(IMGUI_DIR)/misc/fonts@/fonts
-LDFLAGS += --no-heap-copy --preload-file lib/metadata@/metadata
-LDFLAGS += --no-heap-copy --preload-file conescan.db@conescan.db
+# LDFLAGS += --no-heap-copy --preload-file $(IMGUI_DIR)/misc/fonts@/fonts
+LDFLAGS += --preload-file lib/metadata@/metadata
+LDFLAGS += --preload-file conescan.db@conescan.db
 endif
 
 LDFLAGS += --shell-file shell_minimal.html $(EMS)
@@ -179,17 +180,17 @@ endif
 
 ifeq ($(TARGET), wasm)
 
-$(EXE): $(OBJS) $(WEB_DIR)
+$(EXE): $(OBJS) $(WEB_DIR) shell_minimal.html
 	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
 $(WEB_DIR):
 	mkdir $@
 
 serve: all
-	python3 -m http.server -d $(WEB_DIR)
+	python serve.py $(WEB_DIR)
 
 endif
 
 
 clean:
-	rm -f $(EXE) $(OBJS) $(WEB_DIR)/*.js $(WEB_DIR)/*.wasm $(WEB_DIR)/*.wasm.pre
+	rm -f $(EXE) $(OBJS) $(WEB_DIR)/*.js $(WEB_DIR)/*.wasm $(WEB_DIR)/*.wasm.pre $(WEB_DIR)/index.data
