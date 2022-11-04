@@ -4,6 +4,10 @@
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
 #include "imgui.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
 #ifdef __EMSCRIPTEN__
 
 #include "imgui_impl_sdl.h"
@@ -18,14 +22,23 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
+
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
 #endif
+
 #include <GL/glew.h>
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
+#include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "shader_utils.h"
 
 #endif // __EMSCRIPTEN__
 
@@ -106,6 +119,143 @@ int copy_file(const char* path_to_read_file, const char* path_to_write_file)
     return 0;
 }
 
+GLuint program;
+GLint attribute_coord2d;
+GLint uniform_vertex_transform;
+GLint uniform_texture_transform;
+GLuint texture_id;
+GLint uniform_mytexture;
+
+float offset_x = 0.0;
+float offset_y = 0.0;
+float scale = 1.0;
+
+bool interpolate = false;
+bool clamp = true;
+bool rotate = false;
+
+GLuint vbo[2];
+
+void display() {
+	glUseProgram(program);
+	glUniform1i(uniform_mytexture, 0);
+
+	glm::mat4 model;
+
+    model = glm::mat4(1.0f);
+
+	glm::mat4 view = glm::lookAt(glm::vec3(0.0, -2.0, 2.0), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 1.0));
+	glm::mat4 projection = glm::perspective(45.0f, 1.0f * 640 / 480, 0.1f, 10.0f);
+
+	glm::mat4 vertex_transform = projection * view * model;
+	glm::mat4 texture_transform = glm::translate(glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1)), glm::vec3(offset_x, offset_y, 0));
+
+	glUniformMatrix4fv(uniform_vertex_transform, 1, GL_FALSE, glm::value_ptr(vertex_transform));
+	glUniformMatrix4fv(uniform_texture_transform, 1, GL_FALSE, glm::value_ptr(texture_transform));
+
+	glClearColor(0.0, 0.0, 0.0, 0.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	/* Set texture wrapping mode */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, clamp ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+
+	/* Set texture interpolation mode */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolate ? GL_LINEAR : GL_NEAREST);
+
+	/* Draw the grid using the indices to our vertices using our vertex buffer objects */
+	glEnableVertexAttribArray(attribute_coord2d);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+	glVertexAttribPointer(attribute_coord2d, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
+	glDrawElements(GL_LINES, 100 * 101 * 4, GL_UNSIGNED_SHORT, 0);
+
+	/* Stop using the vertex buffer object */
+	glDisableVertexAttribArray(attribute_coord2d);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+
+int init_resources() {
+	program = create_program("graph.v.glsl", "graph.f.glsl");
+	if (program == 0)
+		return 0;
+
+	attribute_coord2d = get_attrib(program, "coord2d");
+	uniform_vertex_transform = get_uniform(program, "vertex_transform");
+	uniform_texture_transform = get_uniform(program, "texture_transform");
+	uniform_mytexture = get_uniform(program, "mytexture");
+
+	if (attribute_coord2d == -1 || uniform_vertex_transform == -1 || uniform_texture_transform == -1 || uniform_mytexture == -1)
+		return 0;
+
+	// Create our datapoints, store it as bytes
+#define N 256
+	GLbyte graph[N][N];
+
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			float x = (i - N / 2) / (N / 2.0);
+			float y = (j - N / 2) / (N / 2.0);
+			float d = hypotf(x, y) * 4.0;
+			float z = (1 - d * d) * expf(d * d / -2.0);
+
+			graph[i][j] = roundf(z * 127 + 128);
+		}
+	}
+
+	/* Upload the texture with our datapoints */
+	glActiveTexture(GL_TEXTURE0);
+	glGenTextures(1, &texture_id);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, N, N, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, graph);
+
+	// Create two vertex buffer objects
+	glGenBuffers(2, vbo);
+
+	// Create an array for 101 * 101 vertices
+	glm::vec2 vertices[101][101];
+
+	for (int i = 0; i < 101; i++) {
+		for (int j = 0; j < 101; j++) {
+			vertices[i][j].x = (j - 50) / 50.0;
+			vertices[i][j].y = (i - 50) / 50.0;
+		}
+	}
+
+	// Tell OpenGL to copy our array to the buffer objects
+	glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof vertices, vertices, GL_STATIC_DRAW);
+
+	// Create an array of indices into the vertex array that traces both horizontal and vertical lines
+	GLushort indices[100 * 101 * 4];
+	int i = 0;
+
+	for (int y = 0; y < 101; y++) {
+		for (int x = 0; x < 100; x++) {
+			indices[i++] = y * 101 + x;
+			indices[i++] = y * 101 + x + 1;
+		}
+	}
+
+	for (int x = 0; x < 101; x++) {
+		for (int y = 0; y < 100; y++) {
+			indices[i++] = y * 101 + x;
+			indices[i++] = (y + 1) * 101 + x;
+		}
+	}
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[1]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
+
+	return 1;
+}
+
+
 int main(int, char**)
 {
 #ifdef __EMSCRIPTEN__
@@ -167,7 +317,6 @@ int main(int, char**)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-    printf("glfw IMGUI_IMPL_OPENGL_ES2\n");
 #elif defined(__APPLE__)
     // GL 3.2 + GLSL 150
     const char* glsl_version = "#version 150";
@@ -178,18 +327,16 @@ int main(int, char**)
 #else
     // GL 3.0 + GLSL 130
     const char* glsl_version = "#version 150";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);    
-    printf("glfw // GL 3.0 + GLSL 130\n");
-            // 3.0+ only
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);    
 #endif
     // glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
     // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL3 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "Conescan", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -259,41 +406,64 @@ int main(int, char**)
     // This way we can use the browsers 'requestAnimationFrame' to control the rendering.
     emscripten_set_main_loop(main_loop, 0, true);
 #else
+
     // Our state
     // bool show_demo_window = true;
     bool exit_requested = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    glewInit();
-unsigned int texture;
-glGenTextures(1, &texture);
-glBindTexture(GL_TEXTURE_2D, texture);
-    // Setup filtering parameters for display
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-// set the texture wrapping/filtering options (on the currently bound texture object)
-// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
-// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-// load and generate the texture
-int width, height, nrChannels;
-unsigned char *data = stbi_load("matrix.jpg", &width, &height, &nrChannels, 0);
-assert(data);
-printf("loaded data\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-printf("loaded texture from buffer\n");
-    // glGenerateMipmap(GL_TEXTURE_2D);
-printf("hurrrrrr\n");
+    GLenum err = glewInit();
+    if(err != GLEW_OK) {
+        printf("Failed to initialize GL %s\n", glewGetErrorString(err));
+        glfwTerminate();
+        return 1;
+    }
+    printf("OpenGL %s, GLSL %s\n", glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
+	if (!GLEW_VERSION_2_0) {
+		fprintf(stderr, "No support for OpenGL 2.0 found\n");
+		return 1;
+	}
+	GLint max_units;
+
+	glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, &max_units);
+	if (max_units < 1) {
+		fprintf(stderr, "Your GPU does not have any vertex texture image units\n");
+		return 1;
+	}
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    assert(init_resources() == 1);
+
+    // create a color attachment texture
+    unsigned int textureColorbuffer;
+    glGenTextures(1, &textureColorbuffer);
+    glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1280, 720, 0, GL_RGB, GL_UNSIGNED_SHORT, NULL);
 
 
+	/* Set texture interpolation mode */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
+    
+    // create a renderbuffer object for depth and stencil attachment (we won't be sampling these)
+    // unsigned int rbo;
+    // glGenRenderbuffers(1, &rbo);
+    // glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    // glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 640, 480); // use a single renderbuffer object for both a depth AND stencil buffer.
+    // glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_COMPONENT, GL_RENDERBUFFER, rbo); // now actually attach it
+    // now that we actually created the framebuffer and added all attachments we want to check if it is actually complete now
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("framebuffer error\n");
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    int display_w, display_h;
 
     // Main loop
     while ((!glfwWindowShouldClose(window)) && !exit_requested)
     {
-
-
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
@@ -307,48 +477,55 @@ printf("hurrrrrr\n");
         ImGui::NewFrame();
         ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
-//     unsigned int fbo;
-// // printf("genframebuffers before\n");
-
-//     glGenFramebuffers(1, &fbo);
-// // printf("genframebuffers\n");
-
-//     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-// // printf("bound framebuffer\n");
-//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-// // printf("glFramebufferTexture2D\n");
-//     GLuint depthrenderbuffer;
-//     glGenRenderbuffers(1, &depthrenderbuffer);
-//     glBindRenderbuffer(GL_RENDERBUFFER, depthrenderbuffer);
-//     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 512, 512);
-//     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthrenderbuffer);
-    
-
-    ImGui::Begin("3d viewer");
-    ImVec2 pos = ImGui::GetCursorScreenPos();
-    ImGui::Image((void*)(intptr_t)texture, ImVec2(width, height));
-    // ImDrawList* drawList = ImGui::GetWindowDrawList();
-    // drawList->AddImage((void*)texture,
-    //     pos,
-    //     ImVec2(pos.x + 512, pos.y + 512),
-    //     ImVec2(0, 1),
-    //     ImVec2(1, 0));
-    ImGui::End();
-// glDeleteFramebuffers(1, &fbo);
-
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         // if (show_demo_window)
         //     ImGui::ShowDemoWindow(&show_demo_window);
         
         ConeScan::RenderUI(&exit_requested);
 
+    ImGui::Begin("3d viewer");
+    ImGui::Text("window");
+    char buff[50]= {0};
+    sprintf(buff, "inc x <= %0.2F", offset_x);
+    if(ImGui::Button(buff)) {offset_x += 0.5;}
+    
+    sprintf(buff, "dec x => %0.2F", offset_x);
+    if(ImGui::Button(buff)) {offset_x -= 0.5;}
+
+    sprintf(buff, "inc y => %0.2F", offset_y);
+    if(ImGui::Button(buff)) {offset_y += 0.5;}
+
+    sprintf(buff, "dec y => %0.2F", offset_y);
+    if(ImGui::Button(buff)) {offset_y -= 0.5;}
+
+    sprintf(buff, "inc scale => %0.2F", scale);
+    if(ImGui::Button(buff)) {scale += 0.5;}
+
+    sprintf(buff, "dec scale => %0.2F", scale);
+    if(ImGui::Button(buff)) {scale -= 0.5;}
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        // glViewport(0, 0, 1280, 720);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	    // glBindTexture(GL_TEXTURE_2D, texture_id);
+        display();
+        ImGui::Image((void*)(intptr_t)textureColorbuffer, ImVec2(1280, 720), ImVec2(0, 1), ImVec2(1, 0));
+
+    } else {
+        printf("!GL_FRAMEBUFFER_COMPLETE\n");
+    }
+
+    ImGui::End();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); 
+
+
         // Rendering
         ImGui::Render();
-        int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
+
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // Update and Render additional Platform Windows
@@ -359,6 +536,7 @@ printf("hurrrrrr\n");
             GLFWwindow* backup_current_context = glfwGetCurrentContext();
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
+
             glfwMakeContextCurrent(backup_current_context);
         }
 
