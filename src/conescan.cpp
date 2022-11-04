@@ -1,5 +1,9 @@
 
 #include <unistd.h>
+#include <errno.h>
+// #include <GL/glext.h>
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #include "imgui.h"
 #include "tinyxml2.h"
@@ -24,13 +28,18 @@ const char* db_path = "/conescan/conescan.db";
 const char* db_path = "conescan.db";
 #endif
 
+struct ConeScanDB db;
+
+char* romFilePath = NULL;
+unsigned char* romFile = NULL;
 char* metadataFilePath = NULL;
+
+struct Definition definition;
 tinyxml2::XMLDocument* metadataFile = NULL;
+
 static ConeScan::Console console;
 bool show_console_window = true;
 bool show_demo_window = false;
-struct Definition definition;
-struct ConeScanDB db;
 
 // stores opened table editors
 bool* tableSelect = NULL;
@@ -38,7 +47,7 @@ bool* tableSelect = NULL;
 // set by the db history API
 int historyCount = 0;
 int pathHistoryMax = 5;
-char **pathHistory;
+char **metadataFilePathHistory;
 
 // for saving/loading layout
 const char *iniData = NULL;
@@ -157,6 +166,8 @@ void loadTable(struct Table* table, tinyxml2::XMLElement *xml)
 {
   if(table == NULL) return;
   if(xml == NULL) return;
+  const char* address_string = xml->Attribute("address");
+  table->address = strtol(address_string, NULL, 16);
   table->level = xml->IntAttribute("level");
   table->elements = xml->IntAttribute("elements");
   definition_scaling_add_string_value(&table->name, xml->Attribute("name"));
@@ -268,20 +279,51 @@ void loadMetadataFile(void)
   }
   bool addToHistory = true;
   for(int i = 0; i < historyCount; i++) {
-    if(strcmp(pathHistory[i], metadataFilePath) == 0)
+    if(strcmp(metadataFilePathHistory[i], metadataFilePath) == 0)
       addToHistory = false;
   }
   if(addToHistory) {
     printf("adding %s to history\n", metadataFilePath);
     conescan_db_add_history(&db, "Definition", metadataFilePath);
     printf("added %s to history\n", metadataFilePath);
-    conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
+    conescan_db_load_history(&db, "Definition", pathHistoryMax, metadataFilePathHistory, &historyCount);
     console.AddLog("added entry to history%s", metadataFilePath);
     assert(sqlite3_db_cacheflush(db.db) == SQLITE_OK);
   }  
 }
 
-void ConeScan::Init()
+void loadRomFile(void)
+{
+  if(!romFilePath) return;
+
+  FILE* fp = fopen(romFilePath, "rb");
+  int length = 0;
+  if(!fp) {
+    console.AddLog("Failed to open %s for reading", romFilePath);
+    free(romFilePath);
+    romFilePath = NULL;
+    return;
+  }
+
+  if (fseek(fp, 0, SEEK_END)) goto io_error;
+  length = ftell(fp);
+  if(!(length > 0)) goto io_error;
+  rewind(fp);
+
+  romFile = (unsigned char*)malloc(length);
+  if(!romFile) goto io_error;
+  fread(romFile, 1, length, fp);
+  console.AddLog("Read %d bytes from %s", length, romFilePath);
+  return;
+
+io_error:
+  console.AddLog("IO error opening rom %s %s", romFilePath, strerror(errno));
+  free(romFilePath);
+  romFilePath = NULL;
+  return;
+}
+
+void ConeScan::Init(void)
 {
   memset(&definition, 0, sizeof(struct Definition));
   memset(&db, 0, sizeof(struct ConeScanDB));
@@ -294,15 +336,15 @@ void ConeScan::Init()
     ImGui::LoadIniSettingsFromMemory(iniData, iniSize);
   }
 
-  pathHistory = (char**)malloc((sizeof(char*) * pathHistoryMax));
-  assert(pathHistory);
-  memset(pathHistory, 0, sizeof(char*) * pathHistoryMax);
+  metadataFilePathHistory = (char**)malloc((sizeof(char*) * pathHistoryMax));
+  assert(metadataFilePathHistory);
+  memset(metadataFilePathHistory, 0, sizeof(char*) * pathHistoryMax);
   for(int i = 0; i < pathHistoryMax; i++) {
-    pathHistory[i] = (char*)malloc(sizeof(char) * 255);
-    assert(pathHistory[i]);
-    memset(pathHistory[i], 0, sizeof(char) * 255);
+    metadataFilePathHistory[i] = (char*)malloc(sizeof(char) * 255);
+    assert(metadataFilePathHistory[i]);
+    memset(metadataFilePathHistory[i], 0, sizeof(char) * 255);
   }
-  conescan_db_load_history(&db, "Definition", pathHistoryMax, pathHistory, &historyCount);
+  conescan_db_load_history(&db, "Definition", pathHistoryMax, metadataFilePathHistory, &historyCount);
   console.RegisterDB(&db);
   console.AddLog("Loaded definition history");
 }
@@ -404,8 +446,11 @@ void RenderTables()
   if (ImGui::TreeNode("Tables")) {
     
     for(int i = 0; i < definition.numTables; i++) {
-
-      ImGui::Selectable(definition.tables[i].name, &tableSelect[i]);
+      if(romFile) {
+        ImGui::Selectable(definition.tables[i].name, &tableSelect[i]);
+      } else {
+        ImGui::TextDisabled(definition.tables[i].name);
+      }
     }
     ImGui::TreePop();
   }
@@ -416,6 +461,7 @@ void RenderTables()
       ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
       char buf[64];
       sprintf(buf, "Table Editor #%2d", i);
+
       if (!ImGui::Begin(buf, &tableSelect[i])) {
         // ImGui::End();
       }
@@ -427,13 +473,84 @@ void RenderTables()
           ImGui::EndPopup();
       }
       ImGui::Text(definition.tables[i].name);
+
+      struct Table* data = &definition.tables[i];
+      struct Table* x = &definition.tables[i].tables[0];
+      struct Table* y = &definition.tables[i].tables[1];
+      
+      // Using those as a base value to create width/height that are factor of the size of our font
+      // const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("7.70").x;
+      const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
+
+      static ImGuiTableFlags tableflags = ImGuiTableFlags_Borders | ImGuiTableFlags_NoBordersInBodyUntilResize;
+
+      if (ImGui::BeginTable("uhhhhh",  x->elements+1, tableflags)) {
+        unsigned long x_axis_address = x->address;
+        unsigned long y_axis_address = y->address;
+        unsigned long d_axis_address = data->address;
+        assert(d_axis_address == 0xc7e48);
+        float output;
+        // X header
+        ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+        for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
+          char buffer[50] = {0};
+          float output;
+
+          *((unsigned char*)(&output) + 3) = romFile[x_axis_address];
+          *((unsigned char*)(&output) + 2) = romFile[x_axis_address+1];
+          *((unsigned char*)(&output) + 1) = romFile[x_axis_address+2];
+          *((unsigned char*)(&output) + 0) = romFile[x_axis_address+3];
+          sprintf(buffer, "%0.2F", output);
+
+          ImGui::Text("%0.2F", output);
+          ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, 50.0f);
+
+        }
+        ImGui::TableHeadersRow();
+        
+        for(int yi = 1; yi < y->elements+1; yi++) {
+          float min_row_height = (float)(int)(TEXT_BASE_HEIGHT * 0.30f);
+          ImGui::TableNextRow(ImGuiTableRowFlags_None, min_row_height);
+
+          ImGui::TableSetColumnIndex(0);
+          ImU32 row_bg_color = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.65f));
+          ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, row_bg_color);
+          *((unsigned char*)(&output) + 3) = romFile[y_axis_address];
+          *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
+          *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
+          *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
+          ImGui::Text("%0.2F", output);
+          y_axis_address+=4;
+          // row_bg_color = ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0));
+          // ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, row_bg_color);
+
+          for(int xi = 1, x_axis_address=x->address; xi < x->elements+1; xi++,x_axis_address+=4,d_axis_address+=4) {
+            ImGui::TableSetColumnIndex(xi);
+            *((unsigned char*)(&output) + 3) = romFile[y_axis_address];
+            *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
+            *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
+            *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
+            ImGui::Text("%0.2F", output);
+            // ImGui::Text("%0.2F", romFile[d_axis_address]);
+          }
+        }
+
+        ImGui::EndTable();
+      }
+
+      // for(int e = 0; e < definition.tables[i].elements; e++) {
+      //   ImGui::Text(" %s %s %s %d %08x", definition.tables[i].name,definition.tables[i].scaling, definition.tables[i].type, definition.tables[i].elements, romFile[definition.tables[i].address]);
+      // }
       ImGui::End();
     }
   }
 }
 
+
+
 void ConeScan::RenderUI(bool* exit_requested)
 {
+
   if(show_console_window)
     console.Draw("Console", &show_console_window);
 
@@ -469,23 +586,50 @@ void ConeScan::RenderUI(bool* exit_requested)
       ImGui::MenuItem("Definition History", NULL, false, false);
 
       for(int i = 0; i < historyCount; i++) {
-        assert(pathHistory[i]);
-        if(ImGui::MenuItem(pathHistory[i], NULL)) {
+        assert(metadataFilePathHistory[i]);
+        if(ImGui::MenuItem(metadataFilePathHistory[i], NULL)) {
           if(metadataFile) closeMetadataFile();
           if(metadataFilePath) {
             free(metadataFilePath);
             metadataFilePath = NULL;
           }
-          int len = strlen(pathHistory[i]);
+          int len = strlen(metadataFilePathHistory[i]);
           if(len > 0) {
             metadataFilePath = (char*)malloc(len + 1);
             assert(metadataFilePath);
             memset(metadataFilePath, 0, len+1);
-            strncpy(metadataFilePath, pathHistory[i], len);
+            strncpy(metadataFilePath, metadataFilePathHistory[i], len);
             loadMetadataFile();
           }
         }
       }
+      ImGui::Separator();
+      ImGui::MenuItem("Load ROM", NULL, false, false);
+
+      if(romFilePath == NULL) {
+        if (ImGui::MenuItem("Open ROM file", NULL)) {
+          char* tmp = getFileOpenPath();
+          if(tmp) {
+            int len = strlen(tmp);
+            if(len > 0) {
+              romFilePath = (char*)malloc(len+1);
+              assert(romFilePath);
+              memset(romFilePath, 0 , len+1);
+              strncpy(romFilePath, tmp, len);
+            }
+            free(tmp);
+            loadRomFile();
+          } 
+        }
+      } else {
+        if (ImGui::MenuItem("Close ROM file", NULL)) {
+          free(romFilePath);
+          romFilePath = NULL;
+          free(romFile);
+          romFile = NULL;
+        }
+      }
+
       ImGui::Separator();
 
       if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;

@@ -105,6 +105,7 @@ EXELIBS = $(NATIVEFILEDIALOG_DIR)/build/lib/Release/x64/libnfd.a
 ifeq ($(UNAME_S), Linux) #LINUX
 	ECHO_MESSAGE = "Linux"
 	LIBS += $(LINUX_GL_LIBS) `pkg-config --static --libs glfw3`
+	LIBS += `pkg-config --static --libs glew`
 
 	# for native file dialog
 	LIBS += $(LINUX_GL_LIBS) `pkg-config --cflags --libs gtk+-3.0`
