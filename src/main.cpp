@@ -33,6 +33,11 @@
 
 #endif // __EMSCRIPTEN__
 
+#if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
+#else
+#include <unistd.h>
+#endif
+
 #include "conescan.h"
 
 #ifdef __EMSCRIPTEN__
@@ -84,8 +89,6 @@ static void glfw_error_callback(int error, const char* description)
 
 #endif // __EMSCRIPTEN__
 
-#include <unistd.h>
-#include <stdio.h>
 int copy_file(const char* path_to_read_file, const char* path_to_write_file)
 {
     char chr;
@@ -214,8 +217,8 @@ int main(int, char**)
     //io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    // ImGui::StyleColorsLight();
+    //ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
 
     ImGuiStyle& style = ImGui::GetStyle();
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -275,7 +278,6 @@ int main(int, char**)
 		return 1;
 	}
 
-
     // Main loop
     while ((!glfwWindowShouldClose(window)) && !exit_requested)
     {
@@ -317,7 +319,6 @@ int main(int, char**)
 
         glfwSwapBuffers(window);
     }
-
 
     // Cleanup
     ConeScan::Cleanup();

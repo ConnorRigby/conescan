@@ -1,3 +1,6 @@
 *.o
 conescan
 /web
+/lib/glfw
+/lib/glew
+/x64

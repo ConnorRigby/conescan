@@ -21,7 +21,7 @@ signed int get_address(unsigned long* address, const char* param)
 
   out = strtoll(param, &extra, base);
 
-  if(strlen(extra) > 0) return -(strlen(extra));
+  if(strlen(extra) > 0) return strlen(extra);
 
   *address = out;
   return 0;

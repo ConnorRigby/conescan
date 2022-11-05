@@ -1,5 +1,7 @@
 
+#ifdef __WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 // #include <GL/glext.h>
 #include <GL/glew.h>
@@ -293,6 +295,8 @@ void loadMetadataFile(void)
     console.AddLog("metadata xmlid = %s", definition.xmlid);
     loadScalings(rom);
     loadTables(rom);
+    delete metadataFile;
+    metadataFile = NULL;
   }
   bool addToHistory = true;
   for(int i = 0; i < metadataHistoryCount; i++) {
@@ -655,7 +659,7 @@ void RenderMenu(bool* exit_requested)
     if (ImGui::BeginMenu("File")) {
       ImGui::MenuItem("Load Definition", NULL, false, false);
 
-      if(metadataFile == NULL) {
+      if(definition.xmlid == NULL) {
         if (ImGui::MenuItem("Open metadata file", NULL)) {
           char* tmp = getFileOpenPath();
           if(tmp) {
@@ -683,6 +687,8 @@ void RenderMenu(bool* exit_requested)
         assert(metadataFilePathHistory[i]);
         if(ImGui::MenuItem(metadataFilePathHistory[i], NULL)) {
           if(metadataFile) closeMetadataFile();
+          definition_deinit(&definition);
+          memset(&definition, 0, sizeof(struct Definition));
           if(metadataFilePath) {
             free(metadataFilePath);
             metadataFilePath = NULL;
