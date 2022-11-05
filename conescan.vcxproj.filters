@@ -22,6 +22,21 @@
     <Filter Include="Source Files\tinyxml2">
       <UniqueIdentifier>{5ebd6800-7a54-4b6a-b0ec-52fe6efa5a51}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\rx8">
+      <UniqueIdentifier>{736b8e71-33ea-4579-9219-498a9b912f22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\rx8">
+      <UniqueIdentifier>{7939be23-1909-4e40-beea-2dbe3fc5e2e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\optarg">
+      <UniqueIdentifier>{933d4540-aac1-41f8-8931-f7399034a7c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\optarg">
+      <UniqueIdentifier>{4cad0fcd-df67-4f2e-8464-488b36204ef7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\J2534">
+      <UniqueIdentifier>{d09ac377-ce87-480c-b923-8adf42187203}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\conescan.cpp">
@@ -81,6 +96,27 @@
     <ClCompile Include="lib\tinyxml2\tinyxml2.cpp">
       <Filter>Source Files\tinyxml2</Filter>
     </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\src\args.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\src\librx8.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\src\progressbar.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\src\UDS.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\src\util.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\lib\getopt\getopt.c">
+      <Filter>Source Files\optarg</Filter>
+    </ClCompile>
+    <ClCompile Include="lib\rx8-ecu-dump\J2534\J2534.cpp">
+      <Filter>Source Files\rx8</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\conescan.h">
@@ -106,6 +142,33 @@
     </ClInclude>
     <ClInclude Include="include\stb_image.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\args.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\librx8.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\OBD2.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\progressbar.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\UDS.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\src\util.h">
+      <Filter>Header Files\rx8</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\J2534\J2534.h">
+      <Filter>Header Files\J2534</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\J2534\j2534_tactrix.h">
+      <Filter>Header Files\J2534</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\rx8-ecu-dump\lib\getopt\getopt.h">
+      <Filter>Header Files\optarg</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

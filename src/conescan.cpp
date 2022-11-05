@@ -10,6 +10,16 @@
 #include "imgui.h"
 #include "tinyxml2.h"
 
+#if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
+#include <tchar.h>
+#include <windows.h>
+#include <conio.h>
+// access
+#include <io.h>
+#define F_OK 0
+#define access _access
+#endif
+
 #ifdef WASM
 // nothing to see here
 #include "emscripten.h"
@@ -24,6 +34,11 @@
 #include "console.h"
 #include "layout.h"
 
+//#define OP20PT32_USE_LIB
+#include "J2534.h"
+#include "librx8.h"
+#include "util.h"
+
 #ifdef WASM
 const char* db_path = "/conescan/conescan.db";
 #else
@@ -31,6 +46,12 @@ const char* db_path = "conescan.db";
 #endif
 
 struct ConeScanDB db;
+size_t j2534Initialize();
+
+J2534 j2534;
+RX8* ecu;
+static unsigned long devID, chanID;
+static const unsigned int CAN_BAUD = 500000;
 
 char* romFilePath = NULL;
 unsigned char* romFile = NULL;
@@ -410,6 +431,10 @@ void ConeScan::Init(void)
   console.AddLog("Loaded definition history");
   
   console.RegisterDB(&db);
+  int rc = j2534Initialize();
+  if (rc) {
+      console.AddLog("ERROR: j2534 init fail");
+  }
 }
 
 void RenderDefinitionInfo()
@@ -795,4 +820,97 @@ void ConeScan::Cleanup()
   conescan_db_save_layout(&db, layoutID, iniData);
 
   conescan_db_close(&db);
+}
+
+size_t j2534Initialize()
+{
+    console.AddLog("initializing J2534\n");
+    j2534.debug(true);
+    if (!j2534.init()) {
+        console.AddLog("failed to connect to J2534 DLL.");
+        return 1;
+    }
+
+    if (j2534.PassThruOpen(NULL, &devID)) {
+        console.AddLog("failed to PassThruOpen()");
+        return 1;
+    }
+
+    if (j2534.PassThruConnect(devID, ISO15765, CAN_ID_BOTH, CAN_BAUD, &chanID)) {
+        reportJ2534Error(j2534);
+        return 1;
+    }
+    j2534.PassThruIoctl(chanID, CLEAR_MSG_FILTERS, NULL, NULL);
+
+    unsigned long filterID = 0;
+
+    PASSTHRU_MSG maskMSG = { 0 };
+    PASSTHRU_MSG maskPattern = { 0 };
+    PASSTHRU_MSG flowControlMsg = { 0 };
+    for (uint8_t i = 0; i < 7; i++) {
+        maskMSG.ProtocolID = ISO15765;
+        maskMSG.TxFlags = ISO15765_FRAME_PAD;
+        maskMSG.Data[0] = 0x00;
+        maskMSG.Data[1] = 0x00;
+        maskMSG.Data[2] = 0x07;
+        maskMSG.Data[3] = 0xff;
+        maskMSG.DataSize = 4;
+
+        maskPattern.ProtocolID = ISO15765;
+        maskPattern.TxFlags = ISO15765_FRAME_PAD;
+        maskPattern.Data[0] = 0x00;
+        maskPattern.Data[1] = 0x00;
+        maskPattern.Data[2] = 0x07;
+        maskPattern.Data[3] = (0xE8 + i);
+        maskPattern.DataSize = 4;
+
+        flowControlMsg.ProtocolID = ISO15765;
+        flowControlMsg.TxFlags = ISO15765_FRAME_PAD;
+        flowControlMsg.Data[0] = 0x00;
+        flowControlMsg.Data[1] = 0x00;
+        flowControlMsg.Data[2] = 0x07;
+        flowControlMsg.Data[3] = (0xE0 + i);
+        flowControlMsg.DataSize = 4;
+
+        if (j2534.PassThruStartMsgFilter(chanID, FLOW_CONTROL_FILTER, &maskMSG, &maskPattern, &flowControlMsg, &filterID))
+        {
+            reportJ2534Error(j2534);
+            return 1;
+
+        }
+    }
+    maskMSG.ProtocolID = ISO15765;
+    maskMSG.TxFlags = ISO15765_FRAME_PAD;
+    maskMSG.Data[0] = 0x00;
+    maskMSG.Data[1] = 0x00;
+    maskMSG.Data[2] = 0x07;
+    maskMSG.Data[3] = 0xf8;
+    maskMSG.DataSize = 4;
+
+    maskPattern.ProtocolID = ISO15765;
+    maskPattern.TxFlags = ISO15765_FRAME_PAD;
+    maskPattern.Data[0] = 0x00;
+    maskPattern.Data[1] = 0x00;
+    maskPattern.Data[2] = 0x07;
+    maskPattern.Data[3] = 0xE8;
+    maskPattern.DataSize = 4;
+
+    if (j2534.PassThruStartMsgFilter(chanID, PASS_FILTER, &maskMSG, &maskPattern, NULL, &filterID)) {
+        console.AddLog("Failed to set message filter");
+        reportJ2534Error(j2534);
+        return 1;
+    }
+
+    if (j2534.PassThruIoctl(chanID, CLEAR_TX_BUFFER, NULL, NULL)) {
+        console.AddLog("Failed to clear j2534 TX buffer");
+        reportJ2534Error(j2534);
+        return 1;
+    }
+
+    if (j2534.PassThruIoctl(chanID, CLEAR_RX_BUFFER, NULL, NULL)) {
+        console.AddLog("Failed to clear j2534 RX buffer");
+        reportJ2534Error(j2534);
+        return 1;
+    }
+    return 0;
 }

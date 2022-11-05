@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui\backends;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\tinyxml2;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\sqlite3;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\src\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui;C:\Users\konno\Desktop\rx8\ecu\conescan\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\src;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\J2534;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui\backends;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\tinyxml2;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\sqlite3;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\src\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui;C:\Users\konno\Desktop\rx8\ecu\conescan\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -138,6 +138,13 @@
     <ClCompile Include="lib\imgui\imgui_draw.cpp" />
     <ClCompile Include="lib\imgui\imgui_tables.cpp" />
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\J2534\J2534.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\lib\getopt\getopt.c" />
+    <ClCompile Include="lib\rx8-ecu-dump\src\args.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\src\librx8.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\src\progressbar.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\src\UDS.cpp" />
+    <ClCompile Include="lib\rx8-ecu-dump\src\util.cpp" />
     <ClCompile Include="lib\sqlite3\sqlite3.c" />
     <ClCompile Include="lib\tinyxml2\tinyxml2.cpp" />
     <ClCompile Include="src\conescan.cpp" />
@@ -159,6 +166,15 @@
     <ClInclude Include="include\layout.h" />
     <ClInclude Include="include\shader_utils.h" />
     <ClInclude Include="include\stb_image.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\J2534\J2534.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\J2534\j2534_tactrix.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\lib\getopt\getopt.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\args.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\librx8.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\OBD2.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\progressbar.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\UDS.h" />
+    <ClInclude Include="lib\rx8-ecu-dump\src\util.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
