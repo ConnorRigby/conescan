@@ -44,11 +44,19 @@ const char* db_path = "conescan.db";
 #endif
 
 struct ConeScanDB db;
-size_t j2534Initialize();
 
 J2534 j2534;
+size_t j2534Initialize();
+
+bool j2534InitOK = false;
+char dllName[PATH_MAX] = { 0 };
+char apiVersion[255] = { 0 };
+char dllVersion[255] = { 0 };
+char firmwareVersion[255] = { 0 };
+
 RX8* ecu;
 char* vin;
+char* calID;
 
 static unsigned long devID, chanID;
 static const unsigned int CAN_BAUD = 500000;
@@ -436,8 +444,10 @@ void ConeScan::Init(void)
   int rc = j2534Initialize();
   if (rc) {
       console.AddLog("ERROR: j2534 init fail");
+      j2534InitOK = false;
   }
   else {
+      j2534InitOK = true;
       ecu = new RX8(&j2534, devID, chanID);
   }
 }
@@ -792,6 +802,64 @@ void RenderMenu(bool* exit_requested)
   }
 }
 
+void RenderConnection()
+{
+    if (j2534InitOK == false) return;
+
+    ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
+    char buf[255];
+    sprintf(buf, "J2534 Interface %s %s", dllName, dllVersion);
+
+    ImGui::Begin(buf, NULL);
+
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Close")) {
+
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::Button("Identify Vehicle")) {
+        if (vin) {
+            free(vin);
+            vin = NULL;
+        }
+        if (calID) {
+            free(calID);
+            calID = NULL;
+        }
+
+        if (ecu->getVIN(&vin)) {
+            console.AddLog("ERROR: Failed to get VIN");
+        }
+        else {
+            console.AddLog("Got VIN: %s", vin);
+        }
+
+        if (ecu->getCalibrationID(&calID)) {
+            console.AddLog("ERROR: failed to read calibration ID");
+        }
+        else {
+            console.AddLog("Got CALID: %s", calID);
+        }
+    }
+    ImGui::Separator();
+
+    ImGui::Text("VIN: ");
+
+    if (vin) {
+        ImGui::SameLine();
+        ImGui::Text("%s", vin);
+    }
+
+    ImGui::Text("Calibration: ");
+    if (calID) {
+        ImGui::SameLine();
+        ImGui::Text("SW%s", calID);
+    }
+}
+
 void ConeScan::RenderUI(bool* exit_requested)
 {
 
@@ -810,33 +878,7 @@ void ConeScan::RenderUI(bool* exit_requested)
   RenderTables();
   ImGui::End();
 
-  ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
-  char buf[64];
-  sprintf(buf, "ecu");
-
-  if (!ImGui::Begin(buf, NULL)) {
-      // ImGui::End();
-  }
-
-  if (ImGui::BeginPopupContextItem())
-  {
-      if (ImGui::MenuItem("Close")) {
-
-      }
-      ImGui::EndPopup();
-  }
-  ImGui::Text("hello, world");
-  if (ImGui::Button("Get VIN")) {
-      if (ecu->getVIN(&vin)) {
-          console.AddLog("Failed to get VIN");
-      }
-      else {
-          console.AddLog("Got VIN: %s", vin);
-      }
-  }
-  if (vin) {
-      ImGui::Text("Connected: %s", vin);
-  }
+  RenderConnection();
 
   ImGui::End();
 }
@@ -881,6 +923,11 @@ size_t j2534Initialize()
         reportJ2534Error(j2534);
         return 1;
     }
+
+    j2534.getDLLName(dllName);
+    j2534.PassThruReadVersion(apiVersion, dllVersion, firmwareVersion, devID);
+    console.AddLog("Connected to J2534 Interface: %s\n API Version: %s\n DLL Version: %s\n Firmware Version: %s", dllName, apiVersion, dllVersion, firmwareVersion);
+
     j2534.PassThruIoctl(chanID, CLEAR_MSG_FILTERS, NULL, NULL);
 
     unsigned long filterID = 0;
