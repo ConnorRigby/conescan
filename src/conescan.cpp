@@ -855,12 +855,18 @@ void ConeScan::Cleanup()
   conescan_db_save_layout(&db, layoutID, iniData);
 
   conescan_db_close(&db);
+  if (j2534.valid()) {
+      j2534.PassThruClose(devID);
+      j2534.PassThruDisconnect(chanID);
+  }
 }
 
 size_t j2534Initialize()
 {
     console.AddLog("initializing J2534\n");
+#ifdef DEBUG
     j2534.debug(true);
+#endif
     if (!j2534.init()) {
         console.AddLog("failed to connect to J2534 DLL.");
         return 1;

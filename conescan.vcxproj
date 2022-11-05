@@ -186,9 +186,10 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
     <ClInclude Include="lib\rx8-ecu-dump\src\OBD2.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\UDS.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\util.h" />
+    <ClInclude Include="windows\resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".gitignore" />
+    <ResourceCompile Include="windows\conescan.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
