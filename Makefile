@@ -21,10 +21,17 @@ IMGUI_DIR = lib/imgui
 TINYXML2_DIR = lib/tinyxml2
 NATIVEFILEDIALOG_DIR = lib/nativefiledialog
 SQLITE3_DIR = lib/sqlite3
+RX8_ECU_DUMP_DIR = lib/rx8-ecu-dump
+J2534_DIR = $(RX8_ECU_DUMP_DIR)/J2534
 
 SOURCES = src/main.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
+SOURCES += $(TINYXML2_DIR)/tinyxml2.cpp
 SOURCES += $(SQLITE3_DIR)/sqlite3.c
+SOURCES += $(RX8_ECU_DUMP_DIR)/src/util.cpp
+SOURCES += $(RX8_ECU_DUMP_DIR)/src/librx8.cpp
+SOURCES += $(RX8_ECU_DUMP_DIR)/src/UDS.cpp
+SOURCES += $(J2534_DIR)/J2534.cpp
 
 ifeq ($(TARGET), x86_64)
 
@@ -37,7 +44,8 @@ ifeq ($(TARGET), wasm)
 
 CC = emcc
 CXX = em++
-WEB_DIR = web
+EMSCRIPTEN_EXTRA_DIR = emscripten
+WEB_DIR = $(EMSCRIPTEN_EXTRA_DIR)/web
 EXE = $(WEB_DIR)/index.html
 
 SOURCES += $(IMGUI_DIR)/backends/imgui_impl_sdl.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp
@@ -53,7 +61,6 @@ LDFLAGS += -lidbfs.js -s ALLOW_MEMORY_GROWTH=1 -s EXIT_RUNTIME=1 -s ASSERTIONS=1
 # (Default value is 0. Set to 1 to enable file-system and include the misc/fonts/ folder as part of the build.)
 USE_FILE_SYSTEM ?= 1
 ifeq ($(USE_FILE_SYSTEM), 0)
-$(error Invalid config)
 LDFLAGS += -s NO_FILESYSTEM=1
 CPPFLAGS += -DIMGUI_DISABLE_FILE_FUNCTIONS
 endif
@@ -63,21 +70,21 @@ LDFLAGS += --preload-file lib/metadata@/metadata
 LDFLAGS += --preload-file conescan.db@conescan.db
 endif
 
-LDFLAGS += --shell-file shell_minimal.html $(EMS)
+LDFLAGS += --shell-file $(EMSCRIPTEN_EXTRA_DIR)/shell_minimal.html $(EMS)
 endif
 
-SOURCES += $(TINYXML2_DIR)/tinyxml2.cpp
 OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
 CXXFLAGS =  -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
-CXXFLAGS += -g -Wall -Wformat
 CXXFLAGS += -I$(TINYXML2_DIR)
 CXXFLAGS += -I$(NATIVEFILEDIALOG_DIR)/src/include
 CXXFLAGS += -I$(SQLITE3_DIR)
-CXXFLAGS += -Iinclude
-LIBS =
+CXXFLAGS += -I$(RX8_ECU_DUMP_DIR)/src
+CXXFLAGS += -I$(J2534_DIR)
+CXXFLAGS += -g # TODO: remove in release builds
+CXXFLAGS += -Wall -Wformat -Iinclude
 
 SOURCES += src/conescan.cpp
 SOURCES += src/definition.cpp
@@ -97,6 +104,7 @@ SOURCES += src/layout.cpp
 ##---------------------------------------------------------------------
 ## BUILD FLAGS PER PLATFORM
 ##---------------------------------------------------------------------
+LIBS =
 ifeq ($(TARGET), x86_64)
 
 EXEDEPS += $(NATIVEFILEDIALOG_DIR)/build/lib/Release/x64/libnfd.a
@@ -118,7 +126,6 @@ ifeq ($(UNAME_S), Darwin) #APPLE
 	ECHO_MESSAGE = "Mac OS X"
 	LIBS += -framework OpenGL -framework Cocoa -framework IOKit -framework CoreVideo
 	LIBS += -L/usr/local/lib -L/opt/local/lib -L/opt/homebrew/lib
-	#LIBS += -lglfw3
 	LIBS += -lglfw
 
 	CXXFLAGS += -I/usr/local/include -I/opt/local/include -I/opt/homebrew/include
@@ -163,6 +170,12 @@ endif
 %.o:$(IMGUI_DIR)/backends/%.cpp
 	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
 
+%.o:$(RX8_ECU_DUMP_DIR)/src/%.cpp
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
+
+%.o:$(J2534_DIR)/%.cpp
+	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
+
 all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
 
@@ -181,7 +194,7 @@ endif
 
 ifeq ($(TARGET), wasm)
 
-$(EXE): $(OBJS) $(WEB_DIR) shell_minimal.html
+$(EXE): $(OBJS) $(WEB_DIR) $(EMSCRIPTEN_EXTRA_DIR)/shell_minimal.html
 	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
 $(WEB_DIR):

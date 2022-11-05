@@ -30,7 +30,7 @@ jobs:
         run: |
           tar \
             --dereference --hard-dereference \
-            --directory web \
+            --directory emscripten/web \
             -cvf /tmp/artifact.tar \
             --exclude=.git \
             --exclude=.github \
