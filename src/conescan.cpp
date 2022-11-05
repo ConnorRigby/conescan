@@ -1,9 +1,3 @@
-
-#ifdef __WIN32
-#include <unistd.h>
-#endif
-#include <errno.h>
-// #include <GL/glext.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
@@ -18,7 +12,11 @@
 #include <io.h>
 #define F_OK 0
 #define access _access
+#else
+#include <unistd.h>
 #endif
+
+#include <errno.h>
 
 #ifdef WASM
 // nothing to see here
@@ -50,6 +48,8 @@ size_t j2534Initialize();
 
 J2534 j2534;
 RX8* ecu;
+char* vin;
+
 static unsigned long devID, chanID;
 static const unsigned int CAN_BAUD = 500000;
 
@@ -431,9 +431,14 @@ void ConeScan::Init(void)
   console.AddLog("Loaded definition history");
   
   console.RegisterDB(&db);
+  if (ecu) delete ecu;
+
   int rc = j2534Initialize();
   if (rc) {
       console.AddLog("ERROR: j2534 init fail");
+  }
+  else {
+      ecu = new RX8(&j2534, devID, chanID);
   }
 }
 
@@ -803,6 +808,36 @@ void ConeScan::RenderUI(bool* exit_requested)
   RenderDefinitionInfo();
   RenderScalings();
   RenderTables();
+  ImGui::End();
+
+  ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
+  char buf[64];
+  sprintf(buf, "ecu");
+
+  if (!ImGui::Begin(buf, NULL)) {
+      // ImGui::End();
+  }
+
+  if (ImGui::BeginPopupContextItem())
+  {
+      if (ImGui::MenuItem("Close")) {
+
+      }
+      ImGui::EndPopup();
+  }
+  ImGui::Text("hello, world");
+  if (ImGui::Button("Get VIN")) {
+      if (ecu->getVIN(&vin)) {
+          console.AddLog("Failed to get VIN");
+      }
+      else {
+          console.AddLog("Got VIN: %s", vin);
+      }
+  }
+  if (vin) {
+      ImGui::Text("Connected: %s", vin);
+  }
+
   ImGui::End();
 }
 
