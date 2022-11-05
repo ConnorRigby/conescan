@@ -76,13 +76,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\src;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\J2534;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui\backends;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN32\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\tinyxml2;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\sqlite3;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\src\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui;C:\Users\konno\Desktop\rx8\ecu\conescan\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>lib\rx8-ecu-dump\src;lib\rx8-ecu-dump\J2534;lib\imgui\backends;lib\glew\glew-2.1.0\include;lib\glfw\glfw-3.3.8.bin.WIN32\include;lib\tinyxml2;lib\sqlite3;lib\nativefiledialog\src\include;lib\imgui;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\build\lib\Debug\x86\nfd_d.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3_mt.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3dll.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\WIN32\glew32.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\WIN32\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\build\vs2010;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\bin\Release\WIN32;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\WIN32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>lib\nativefiledialog\build\lib\Debug\x86\nfd_d.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3_mt.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3dll.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib\nativefiledialog\build\vs2010;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022;lib\glew\glew-2.1.0\bin\Release\WIN32;lib\glew\glew-2.1.0\lib\Release\WIN32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -107,13 +107,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\src;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\rx8-ecu-dump\J2534;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui\backends;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\tinyxml2;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\sqlite3;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\src\include;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\imgui;C:\Users\konno\Desktop\rx8\ecu\conescan\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>lib\rx8-ecu-dump\src;lib\rx8-ecu-dump\J2534;lib\imgui\backends;lib\glew\glew-2.1.0\include;lib\glfw\glfw-3.3.8.bin.WIN64\include;lib\tinyxml2;lib\sqlite3;lib\nativefiledialog\src\include;lib\imgui;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\build\lib\Debug\x64\nfd_d.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3_mt.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3dll.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\x64\glew32.lib;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\x64\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\konno\Desktop\rx8\ecu\conescan\lib\nativefiledialog\build\vs2010;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\bin\Release\x64;C:\Users\konno\Desktop\rx8\ecu\conescan\lib\glew\glew-2.1.0\lib\Release\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>lib\nativefiledialog\build\lib\Debug\x64\nfd_d.lib;lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3.lib;lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3_mt.lib;lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022\glfw3dll.lib;lib\glew\glew-2.1.0\lib\Release\x64\glew32.lib;lib\glew\glew-2.1.0\lib\Release\x64\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>lib\nativefiledialog\build\vs2010;lib\glfw\glfw-3.3.8.bin.WIN64\lib-vc2022;lib\glew\glew-2.1.0\bin\Release\x64;lib\glew\glew-2.1.0\lib\Release\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,9 +143,7 @@
     <ClCompile Include="lib\imgui\imgui_widgets.cpp" />
     <ClCompile Include="lib\rx8-ecu-dump\J2534\J2534.cpp" />
     <ClCompile Include="lib\rx8-ecu-dump\lib\getopt\getopt.c" />
-    <ClCompile Include="lib\rx8-ecu-dump\src\args.cpp" />
     <ClCompile Include="lib\rx8-ecu-dump\src\librx8.cpp" />
-    <ClCompile Include="lib\rx8-ecu-dump\src\progressbar.cpp" />
     <ClCompile Include="lib\rx8-ecu-dump\src\UDS.cpp" />
     <ClCompile Include="lib\rx8-ecu-dump\src\util.cpp" />
     <ClCompile Include="lib\sqlite3\sqlite3.c" />
@@ -172,10 +170,8 @@
     <ClInclude Include="lib\rx8-ecu-dump\J2534\J2534.h" />
     <ClInclude Include="lib\rx8-ecu-dump\J2534\j2534_tactrix.h" />
     <ClInclude Include="lib\rx8-ecu-dump\lib\getopt\getopt.h" />
-    <ClInclude Include="lib\rx8-ecu-dump\src\args.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\librx8.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\OBD2.h" />
-    <ClInclude Include="lib\rx8-ecu-dump\src\progressbar.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\UDS.h" />
     <ClInclude Include="lib\rx8-ecu-dump\src\util.h" />
   </ItemGroup>

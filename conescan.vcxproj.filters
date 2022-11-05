@@ -96,13 +96,7 @@
     <ClCompile Include="lib\tinyxml2\tinyxml2.cpp">
       <Filter>Source Files\tinyxml2</Filter>
     </ClCompile>
-    <ClCompile Include="lib\rx8-ecu-dump\src\args.cpp">
-      <Filter>Source Files\rx8</Filter>
-    </ClCompile>
     <ClCompile Include="lib\rx8-ecu-dump\src\librx8.cpp">
-      <Filter>Source Files\rx8</Filter>
-    </ClCompile>
-    <ClCompile Include="lib\rx8-ecu-dump\src\progressbar.cpp">
       <Filter>Source Files\rx8</Filter>
     </ClCompile>
     <ClCompile Include="lib\rx8-ecu-dump\src\UDS.cpp">
@@ -143,16 +137,10 @@
     <ClInclude Include="include\stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="lib\rx8-ecu-dump\src\args.h">
-      <Filter>Header Files\rx8</Filter>
-    </ClInclude>
     <ClInclude Include="lib\rx8-ecu-dump\src\librx8.h">
       <Filter>Header Files\rx8</Filter>
     </ClInclude>
     <ClInclude Include="lib\rx8-ecu-dump\src\OBD2.h">
-      <Filter>Header Files\rx8</Filter>
-    </ClInclude>
-    <ClInclude Include="lib\rx8-ecu-dump\src\progressbar.h">
       <Filter>Header Files\rx8</Filter>
     </ClInclude>
     <ClInclude Include="lib\rx8-ecu-dump\src\UDS.h">

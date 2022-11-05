@@ -5,6 +5,50 @@ on:
     #
 
 jobs:
+  Windows:
+    runs-on: windows-latest
+    steps:
+      - uses: microsoft/setup-msbuild@v1.1
+
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Fetch GLFW
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri 'https://github.com/glfw/glfw/releases/download/3.3.8/glfw-3.3.8.bin.WIN32.zip' -OutFile 'glfw-3.3.8.bin.WIN32.zip'
+          Expand-Archive -Path 'glfw-3.3.8.bin.WIN32.zip' -DestinationPath 'lib/glfw'
+          Invoke-WebRequest -Uri 'https://github.com/glfw/glfw/releases/download/3.3.8/glfw-3.3.8.bin.WIN64.zip' -OutFile 'glfw-3.3.8.bin.WIN64.zip'
+          Expand-Archive -Path 'glfw-3.3.8.bin.WIN64.zip' -DestinationPath 'lib/glfw'
+
+
+      - name: Fetch GLEW
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/glew/glew/2.1.0/glew-2.1.0-win32.zip' -OutFile 'glew-2.1.0-win32.zip' -UserAgent "Wget"
+          Expand-Archive -Path 'glew-2.1.0-win32.zip' -DestinationPath 'lib/glew'
+
+      - name: Patch NativeFileDialog
+        working-directory: lib\nativefiledialog
+        run: git apply ../0001-build-update-vs-solution-to-vs2022.patch
+        
+      - name: Build ConeScan
+        run: msbuild conescan.sln /p:Configuration="Debug" /p:PlatformTarget=x86 /p:Platform=x86
+
+      - name: Assemble Assets
+        shell: powershell
+        run: |
+          mkdir artifact
+          cp Debug\conescan.exe artifact\
+          cp lib\glew\glew-2.1.0\bin\Release\Win32\glew32.dll artifact\
+          cp conescan.db artifact\
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Win32-Debug
+          path: artifact
+
   Emscripten:
     runs-on: ubuntu-18.04
     steps:

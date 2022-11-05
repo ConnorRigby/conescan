@@ -7,6 +7,7 @@
 [submodule "lib/nativefiledialog"]
 	path = lib/nativefiledialog
 	url = git@github.com:mlabbe/nativefiledialog.git
+	ignore = dirty # ignore patches
 [submodule "lib/rx8-ecu-dump"]
 	path = lib/rx8-ecu-dump
 	url = git@github.com:ConnorRigby/rx8-ecu-dump.git
