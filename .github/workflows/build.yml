@@ -39,7 +39,10 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: Conescan-Win32-Debug
-          path: Debug
+          path: |
+            Debug\conescan.exe
+            Debug\conescan.db
+            Debug\glew32.dll
 
       - name: Build ConeScan Release
         run: msbuild conescan.sln /p:Configuration="Release" /p:PlatformTarget=x86 /p:Platform=x86
@@ -47,7 +50,10 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: Conescan-Win32-Release
-          path: Release
+          path: |
+            Release\conescan.exe
+            Release\conescan.db
+            Release\glew32.dll
 
   Emscripten:
     runs-on: ubuntu-18.04
