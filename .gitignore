@@ -5,3 +5,5 @@ conescan
 /lib/glew
 /x64
 /Debug
+/Release
+

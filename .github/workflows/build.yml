@@ -33,21 +33,21 @@ jobs:
         working-directory: lib\nativefiledialog
         run: git apply ../0001-build-update-vs-solution-to-vs2022.patch
         
-      - name: Build ConeScan
+      - name: Build ConeScan Debug
         run: msbuild conescan.sln /p:Configuration="Debug" /p:PlatformTarget=x86 /p:Platform=x86
-
-      - name: Assemble Assets
-        shell: powershell
-        run: |
-          mkdir artifact
-          cp Debug\conescan.exe artifact\
-          cp lib\glew\glew-2.1.0\bin\Release\Win32\glew32.dll artifact\
-          cp conescan.db artifact\
 
       - uses: actions/upload-artifact@v3
         with:
-          name: Win32-Debug
-          path: artifact
+          name: Conescan-Win32-Debug
+          path: Debug
+
+      - name: Build ConeScan Release
+        run: msbuild conescan.sln /p:Configuration="Release" /p:PlatformTarget=x86 /p:Platform=x86
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Conescan-Win32-Release
+          path: Release
 
   Emscripten:
     runs-on: ubuntu-18.04

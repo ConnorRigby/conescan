@@ -74,7 +74,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096;WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>lib\rx8-ecu-dump\src;lib\rx8-ecu-dump\J2534;lib\imgui\backends;lib\glew\glew-2.1.0\include;lib\glfw\glfw-3.3.8.bin.WIN32\include;lib\tinyxml2;lib\sqlite3;lib\nativefiledialog\src\include;lib\imgui;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -84,6 +84,10 @@
       <AdditionalDependencies>lib\nativefiledialog\build\lib\Debug\x86\nfd_d.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3_mt.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3dll.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>lib\nativefiledialog\build\vs2010;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022;lib\glew\glew-2.1.0\bin\Release\WIN32;lib\glew\glew-2.1.0\lib\Release\WIN32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(ProjectDir)lib\glew\glew-2.1.0\bin\Release\Win32\glew32.dll" "$(OutDir)"
+xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -91,15 +95,23 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;PATH_MAX=4096;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>lib\rx8-ecu-dump\src;lib\rx8-ecu-dump\J2534;lib\imgui\backends;lib\glew\glew-2.1.0\include;lib\glfw\glfw-3.3.8.bin.WIN32\include;lib\tinyxml2;lib\sqlite3;lib\nativefiledialog\src\include;lib\imgui;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>lib\nativefiledialog\build\vs2010;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022;lib\glew\glew-2.1.0\bin\Release\WIN32;lib\glew\glew-2.1.0\lib\Release\WIN32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>lib\nativefiledialog\build\lib\Release\x86\nfd.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3_mt.lib;lib\glfw\glfw-3.3.8.bin.WIN32\lib-vc2022\glfw3dll.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32.lib;lib\glew\glew-2.1.0\lib\Release\WIN32\glew32s.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TerminalServerAware>false</TerminalServerAware>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y "$(ProjectDir)lib\glew\glew-2.1.0\bin\Release\Win32\glew32.dll" "$(OutDir)"
+xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

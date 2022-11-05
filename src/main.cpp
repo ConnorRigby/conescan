@@ -34,6 +34,7 @@
 #endif // __EMSCRIPTEN__
 
 #if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
+#include <Windows.h>
 #else
 #include <unistd.h>
 #endif
@@ -113,7 +114,11 @@ int copy_file(const char* path_to_read_file, const char* path_to_write_file)
     return 0;
 }
 
+#if defined(NDEBUG)
+INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, INT nCmdShow)
+#else
 int main(int, char**)
+#endif
 {
 #ifdef __EMSCRIPTEN__
     mount_fs();
