@@ -119,6 +119,7 @@ ifeq ($(UNAME_S), Linux) #LINUX
 	LIBS += $(LINUX_GL_LIBS) `pkg-config --cflags --libs gtk+-3.0`
 
 	CXXFLAGS += `pkg-config --cflags glfw3`
+	CXXFLAGS += -Wl,-R,'$$ORIGIN'
 	CFLAGS = $(CXXFLAGS)
 endif
 

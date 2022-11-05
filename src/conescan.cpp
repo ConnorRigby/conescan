@@ -804,8 +804,6 @@ void RenderMenu(bool* exit_requested)
 
 void RenderConnection()
 {
-    if (j2534InitOK == false) return;
-
     ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
     char buf[255];
     sprintf(buf, "J2534 Interface %s %s", dllName, dllVersion);
@@ -819,30 +817,31 @@ void RenderConnection()
         }
         ImGui::EndPopup();
     }
+    if (j2534InitOK) {
+      if (ImGui::Button("Identify Vehicle")) {
+          if (vin) {
+              free(vin);
+              vin = NULL;
+          }
+          if (calID) {
+              free(calID);
+              calID = NULL;
+          }
 
-    if (ImGui::Button("Identify Vehicle")) {
-        if (vin) {
-            free(vin);
-            vin = NULL;
-        }
-        if (calID) {
-            free(calID);
-            calID = NULL;
-        }
+          if (ecu->getVIN(&vin)) {
+              console.AddLog("ERROR: Failed to get VIN");
+          }
+          else {
+              console.AddLog("Got VIN: %s", vin);
+          }
 
-        if (ecu->getVIN(&vin)) {
-            console.AddLog("ERROR: Failed to get VIN");
-        }
-        else {
-            console.AddLog("Got VIN: %s", vin);
-        }
-
-        if (ecu->getCalibrationID(&calID)) {
-            console.AddLog("ERROR: failed to read calibration ID");
-        }
-        else {
-            console.AddLog("Got CALID: %s", calID);
-        }
+          if (ecu->getCalibrationID(&calID)) {
+              console.AddLog("ERROR: failed to read calibration ID");
+          }
+          else {
+              console.AddLog("Got CALID: %s", calID);
+          }
+      }
     }
     ImGui::Separator();
 
@@ -858,11 +857,11 @@ void RenderConnection()
         ImGui::SameLine();
         ImGui::Text("SW%s", calID);
     }
+  ImGui::End();
 }
 
 void ConeScan::RenderUI(bool* exit_requested)
 {
-
   if(show_console_window)
     console.Draw("Console", &show_console_window);
 
@@ -879,8 +878,6 @@ void ConeScan::RenderUI(bool* exit_requested)
   ImGui::End();
 
   RenderConnection();
-
-  ImGui::End();
 }
 
 void ConeScan::Cleanup()
@@ -897,15 +894,16 @@ void ConeScan::Cleanup()
   conescan_db_save_layout(&db, layoutID, iniData);
 
   conescan_db_close(&db);
-  if (j2534.valid()) {
-      j2534.PassThruClose(devID);
-      j2534.PassThruDisconnect(chanID);
+  if (j2534InitOK) {
+    j2534.PassThruClose(devID);
+    j2534.PassThruDisconnect(chanID);
   }
 }
 
 size_t j2534Initialize()
 {
     console.AddLog("initializing J2534\n");
+    j2534.getDLLName(dllName);
 #ifdef DEBUG
     j2534.debug(true);
 #endif
@@ -924,7 +922,6 @@ size_t j2534Initialize()
         return 1;
     }
 
-    j2534.getDLLName(dllName);
     j2534.PassThruReadVersion(apiVersion, dllVersion, firmwareVersion, devID);
     console.AddLog("Connected to J2534 Interface: %s\n API Version: %s\n DLL Version: %s\n Firmware Version: %s", dllName, apiVersion, dllVersion, firmwareVersion);
 
