@@ -1,5 +1,11 @@
 #pragma once
 
+typedef union ScaledValue {
+    float    f32;
+    uint8_t  u8;
+    uint16_t u16;
+} scaled_value_t;
+
 struct Scaling {
     char* name;
     char* units;
@@ -60,3 +66,5 @@ void definition_scaling_add_string_value(char** field, const char* value);
 void definition_new_tables(struct Table** tables, int count);
 
 void definition_deinit(struct Definition* definition);
+
+bool loadScalingValue(struct Scaling* scaling, char* rom, scaled_value_t* value);
