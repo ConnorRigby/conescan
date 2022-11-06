@@ -68,6 +68,7 @@ static const unsigned int CAN_BAUD = 500000;
 
 char* romFilePath = NULL;
 unsigned char* romFile = NULL;
+long romFileLength = 0;
 char* metadataFilePath = NULL;
 
 struct Definition definition;
@@ -75,11 +76,16 @@ tinyxml2::XMLDocument* metadataFile = NULL;
 
 static ConeScan::Console console;
 static MemoryEditor mem_edit;
+static MemoryEditor rom_edit;
 bool show_console_window = true;
 bool show_demo_window = false;
 
 // stores opened table editors
 bool* tableSelect = NULL;
+
+// double pointer buffer, each has number of elements
+bool* cellSelect = NULL;
+int numCells = 0;
 
 int pathHistoryMax = 5;
 
@@ -106,7 +112,7 @@ char* getFileOpenPath(char* defaultPath, bool save)
       result = NFD_PickFolder(NULL, &outPath);
   }
   else {
-      result = NFD_OpenDialog(NULL, defaultPath, &outPath);
+      result = NFD_OpenDialog(NULL, NULL, &outPath);
   }
       
   if (result == NFD_OKAY) {
@@ -247,6 +253,8 @@ void loadTables(tinyxml2::XMLNode *rom)
     table = table->NextSiblingElement("table");
   }
   console.AddLog("Processing %d tables", definition.numTables);
+  cellSelect;
+  numCells = 0;
   definition_new_tables(&definition.tables, definition.numTables);
   if(tableSelect) {
     free(tableSelect);
@@ -281,17 +289,22 @@ void loadTables(tinyxml2::XMLNode *rom)
   jndex = 0;
   while(table) {
     loadTable(&definition.tables[index], table);
+    numCells += definition.tables[index].elements;
     tinyxml2::XMLElement *Subtable;
     Subtable = table->FirstChildElement("table");
     jndex = 0;
     while(Subtable) {
       loadTable(&definition.tables[index].tables[jndex], Subtable);
+      numCells += definition.tables[index].tables[jndex].elements;
       jndex +=1;
       Subtable = Subtable->NextSiblingElement("table");
     }
     index+=1;
     table = table->NextSiblingElement("table");
   }
+  cellSelect = (bool*)malloc(sizeof(bool) * numCells);
+  assert(cellSelect);
+  memset(cellSelect, 0, sizeof(bool) * numCells);
 }
 
 void loadMetadataFile(void) 
@@ -390,6 +403,7 @@ void loadRomFile(void)
   rewind(fp);
 
   romFile = (unsigned char*)malloc(length);
+  romFileLength = length;
   if(!romFile) goto io_error;
   fread(romFile, 1, length, fp);
   console.AddLog("Read %d bytes from %s", length, romFilePath);
@@ -465,6 +479,8 @@ void ConeScan::Init(void)
       j2534InitOK = true;
       ecu = new RX8(&j2534, devID, chanID);
   }
+
+  rom_edit.Open = false;
 }
 
 void RenderDefinitionInfo()
@@ -595,7 +611,7 @@ void Render2DTable(struct Table* table)
   }
 }
 
-void Render3DTable(struct Table* table) 
+void Render3DTable(struct Table* table, bool* cellSelectIndex) 
 {
   assert(romFile);
   assert(table);
@@ -613,26 +629,28 @@ void Render3DTable(struct Table* table)
     unsigned long x_axis_address = x->address;
     unsigned long y_axis_address = y->address;
     unsigned long d_axis_address = table->address;
-    float output;
+    float output = 0.0;
     // X header
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+    cellSelectIndex += sizeof(bool);
     for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
       char buffer[50] = {0};
-      float output;
+      float output = 0.0;
 
       *((unsigned char*)(&output) + 3) = romFile[x_axis_address];
       *((unsigned char*)(&output) + 2) = romFile[x_axis_address+1];
       *((unsigned char*)(&output) + 1) = romFile[x_axis_address+2];
       *((unsigned char*)(&output) + 0) = romFile[x_axis_address+3];
+      assert(x->Scaling);
       sprintf(buffer, x->Scaling->format, output);
 
       ImGui::Text(buffer);
       ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, 50.0f);
-
+      cellSelectIndex += sizeof(bool);
     }
     ImGui::TableHeadersRow();
     
-    for(int yi = 1; yi < y->elements+1; yi++) {
+    for(int yi = 1,f=0; yi < y->elements+1; yi++,f++) {
       float min_row_height = (float)(int)(TEXT_BASE_HEIGHT * 0.30f);
       ImGui::TableNextRow(ImGuiTableRowFlags_None, min_row_height);
 
@@ -643,17 +661,36 @@ void Render3DTable(struct Table* table)
       *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
       *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
       *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
-      ImGui::Text("%0.2F", output);
+      char buf[32];
+      sprintf(buf, y->Scaling->format, output);
+      ImGui::PushID(yi);
+      ImGui::Selectable(buf, cellSelectIndex, 0, ImVec2(0.0, 0.0));
+      if (*cellSelectIndex) {
+          //rom_edit.HighlightColor = ImGui
+          rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
+          *cellSelectIndex = false;
+      }
+      ImGui::PopID();
       y_axis_address+=4;
 
-      for(int xi = 1, x_axis_address=x->address; xi < x->elements+1; xi++,x_axis_address+=4,d_axis_address+=4) {
+      for(int xi = 1, g=0, x_axis_address=x->address; xi < x->elements+1; xi++,g++,x_axis_address+=4,d_axis_address+=4) {
         ImGui::TableSetColumnIndex(xi);
         *((unsigned char*)(&output) + 3) = romFile[y_axis_address];
         *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
         *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
         *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
-        ImGui::Text(y->Scaling->format, output);
-        // ImGui::Text("%0.2F", romFile[d_axis_address]);
+        //ImGui::Text(y->Scaling->format, output);
+        assert(y->Scaling);
+        char buf[32];
+        sprintf(buf, y->Scaling->format, output);
+        ImGui::PushID(xi);
+        ImGui::Selectable(buf,cellSelectIndex, 0, ImVec2(0.0, 0.0));
+        ImGui::PopID();
+        if (*cellSelectIndex) {
+            rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
+            *cellSelectIndex = false;
+        }
+        cellSelectIndex += sizeof(bool);
       }
     }
 
@@ -676,6 +713,8 @@ void RenderTables()
   }
 
   // TODO: load into categories
+  long j = 0;
+  assert(cellSelect);
   for(int i = 0; i < definition.numTables; i++) {
     if(tableSelect[i]) {
       ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
@@ -695,11 +734,16 @@ void RenderTables()
       ImGui::Text(definition.tables[i].name);
       assert(definition.tables[i].type);
       if(strcmp(definition.tables[i].type, "3D") == 0) {
-        Render3DTable(&definition.tables[i]);
+        Render3DTable(&definition.tables[i], &cellSelect[j]);
+        j += definition.tables[i].elements;
+        j += definition.tables[i].tables[0].elements;
+        j += definition.tables[i].tables[1].elements;
       } else if(strcmp(definition.tables[i].type, "2D") == 0) {
         Render2DTable(&definition.tables[i]);
-      // } else if(strcmp(definition.tables[i], "1D") == 0) {
-
+        j += definition.tables[i].elements;
+        j += definition.tables[i].tables[0].elements;
+      } else if(strcmp(definition.tables[i].type, "1D") == 0) {
+          j += definition.tables[i].elements;
       } else {
         ImGui::Text("Unknown table type: %s", definition.tables[i].type);
       }
@@ -763,7 +807,7 @@ void RenderMenu(bool* exit_requested)
 
       if(romFilePath == NULL) {
         if (ImGui::MenuItem("Open ROM file", NULL)) {
-            char* tmp = getFileOpenPath(NULL , true);
+            char* tmp = getFileOpenPath(NULL , false);
           if(tmp) {
             int len = strlen(tmp);
             if(len > 0) {
@@ -851,8 +895,8 @@ void RenderMenu(bool* exit_requested)
             int rc;
             console.AddLog("[UDS] Saving transfer to %s (default='%s')", path, defaultFileName);
             outFile = fopen(fullPath, "wb");
-            
             if (!outFile) goto cleanup;
+            assert(uds_transfer.payload);
             rc = fwrite(uds_transfer.payload, 1, uds_transfer.transferBytes, outFile);
             if (rc != 1) goto cleanup;
             
@@ -943,7 +987,7 @@ void RenderConnection()
     ImGui::Text("Transfer Progress %0.2F", uds_transfer.transferProgress);
     if (uds_transfer.payload) {
         if(mem_edit.Open)
-            mem_edit.DrawWindow("Rom Memory Editor", uds_transfer.payload, uds_transfer.transferBytes);
+            mem_edit.DrawWindow("ECU Memory Editor", uds_transfer.payload, uds_transfer.transferBytes);
 
         if (mem_edit.Open == false) {
             uds_transfer.downloadinProgress = false;
@@ -952,6 +996,17 @@ void RenderConnection()
 
 
   ImGui::End();
+}
+
+void RenderRomEdit()
+{
+    //if (rom_edit.Open)
+    if(romFile)
+        rom_edit.DrawWindow("Rom Memory Editor", romFile, romFileLength);
+
+    if (rom_edit.Open == false) {
+        uds_transfer.downloadinProgress = false;
+    }
 }
 
 void ConeScan::RenderUI(bool* exit_requested)
@@ -972,6 +1027,7 @@ void ConeScan::RenderUI(bool* exit_requested)
   ImGui::End();
 
   RenderConnection();
+  RenderRomEdit();
 }
 
 void ConeScan::Cleanup()
