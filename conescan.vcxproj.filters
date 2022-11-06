@@ -37,6 +37,18 @@
     <Filter Include="Header Files\J2534">
       <UniqueIdentifier>{d09ac377-ce87-480c-b923-8adf42187203}</UniqueIdentifier>
     </Filter>
+    <Filter Include="metadata">
+      <UniqueIdentifier>{e1e43ca8-67fa-4576-8c6e-c88be99f9e5b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="metadata\Mazda">
+      <UniqueIdentifier>{7dc7aa79-e937-4c26-83da-00a15bc84dd9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="metadata\Mazda\MX5">
+      <UniqueIdentifier>{99142cb4-53a9-4da1-8be0-fa0fe4a0ffe3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="metadata\Mazda\RX8">
+      <UniqueIdentifier>{731c5731-ffab-4985-9627-b33e28ae106a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\conescan.cpp">
@@ -111,6 +123,9 @@
     <ClCompile Include="lib\rx8-ecu-dump\J2534\J2534.cpp">
       <Filter>Source Files\rx8</Filter>
     </ClCompile>
+    <ClCompile Include="src\uds_request_download.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\conescan.h">
@@ -161,10 +176,24 @@
     <ClInclude Include="windows\resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\uds_request_download.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\imgui_memory_editor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="windows\conescan.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="lib\metadata\Mazda\MX5\lfg2ee.xml">
+      <Filter>metadata\Mazda\MX5</Filter>
+    </Xml>
+    <Xml Include="lib\metadata\Mazda\RX8\N3K1EU000.xml">
+      <Filter>metadata\Mazda\RX8</Filter>
+    </Xml>
   </ItemGroup>
 </Project>

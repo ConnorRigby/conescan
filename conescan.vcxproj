@@ -169,6 +169,7 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\shader_utils.cpp" />
     <ClCompile Include="src\table_editor.cpp" />
+    <ClCompile Include="src\uds_request_download.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\conescan.h" />
@@ -176,9 +177,11 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
     <ClInclude Include="include\console.h" />
     <ClInclude Include="include\definition.h" />
     <ClInclude Include="include\history.h" />
+    <ClInclude Include="include\imgui_memory_editor.h" />
     <ClInclude Include="include\layout.h" />
     <ClInclude Include="include\shader_utils.h" />
     <ClInclude Include="include\stb_image.h" />
+    <ClInclude Include="include\uds_request_download.h" />
     <ClInclude Include="lib\rx8-ecu-dump\J2534\J2534.h" />
     <ClInclude Include="lib\rx8-ecu-dump\J2534\j2534_tactrix.h" />
     <ClInclude Include="lib\rx8-ecu-dump\lib\getopt\getopt.h" />
@@ -190,6 +193,10 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="windows\conescan.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="lib\metadata\Mazda\MX5\lfg2ee.xml" />
+    <Xml Include="lib\metadata\Mazda\RX8\N3K1EU000.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

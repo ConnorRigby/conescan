@@ -1,0 +1,25 @@
+<rom>
+	<romid>
+		<xmlid>N3K1EU000</xmlid>
+		<internalidaddress>6c646</internalidaddress>
+		<internalidstring>N3K1EU000</internalidstring>
+		<caseid>N3K1</caseid>
+		<ecuid>N3K1EU000</ecuid>
+		<make>Mazda</make>
+		<market>JDM</market>
+		<model>RX8</model>
+		<transmission>5MT</transmission>
+		<year>2005</year>
+		<flashmethod>rxprog</flashmethod>
+		<memmodel>SH7055</memmodel>
+		<checksummodule>subarudbw</checksummodule>
+	</romid>
+
+	<scaling name="882208" toexpr="x" frexpr="x" format="%d" min="720" max="1150" inc="10" storagetype="uint16" endian="big"/>
+	<scaling name="ECT" toexpr="x" frexpr="x" format="%0.0f" min="-40" max="100" inc="10" storagetype="float" endian="big"/>
+
+	<table name="Idle Target RPM" category="Idle" address="6da68" type="2D" level="4" swapxy="true" elements="7" scaling="882208">
+		<table name="ECT" address="6da4c" type="Y Axis" elements="7" scaling="882240"/>
+	</table>
+
+</rom>

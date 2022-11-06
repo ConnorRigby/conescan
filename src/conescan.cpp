@@ -2,12 +2,14 @@
 #include <GLFW/glfw3.h>
 
 #include "imgui.h"
+#include "imgui_memory_editor.h"
 #include "tinyxml2.h"
 
 #if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
 #include <tchar.h>
 #include <windows.h>
 #include <conio.h>
+#include <pathcch.h>
 // access
 #include <io.h>
 #define F_OK 0
@@ -37,6 +39,8 @@
 #include "librx8.h"
 #include "util.h"
 
+#include "uds_request_download.h"
+
 #ifdef WASM
 const char* db_path = "/conescan/conescan.db";
 #else
@@ -57,6 +61,7 @@ char firmwareVersion[255] = { 0 };
 RX8* ecu;
 char* vin;
 char* calID;
+struct UDSRequestDownload uds_transfer;
 
 static unsigned long devID, chanID;
 static const unsigned int CAN_BAUD = 500000;
@@ -69,6 +74,7 @@ struct Definition definition;
 tinyxml2::XMLDocument* metadataFile = NULL;
 
 static ConeScan::Console console;
+static MemoryEditor mem_edit;
 bool show_console_window = true;
 bool show_demo_window = false;
 
@@ -87,7 +93,7 @@ char **romFilePathHistory;
 const char *iniData = NULL;
 size_t iniSize = 0;
 
-char* getFileOpenPath() 
+char* getFileOpenPath(char* defaultPath, bool save) 
 #ifdef WASM
 {
   return "/metadata/lfg2ee.xml";
@@ -95,7 +101,13 @@ char* getFileOpenPath()
 #else
 {
   nfdchar_t *outPath = NULL;
-  nfdresult_t result = NFD_OpenDialog(NULL, NULL, &outPath);
+  nfdresult_t result;
+  if (save) {
+      result = NFD_PickFolder(NULL, &outPath);
+  }
+  else {
+      result = NFD_OpenDialog(NULL, defaultPath, &outPath);
+  }
       
   if (result == NFD_OKAY) {
     return outPath;
@@ -241,6 +253,7 @@ void loadTables(tinyxml2::XMLNode *rom)
     tableSelect = NULL;
   }
   tableSelect = (bool*)malloc(sizeof(bool) * definition.numTables);
+  assert(tableSelect);
   memset(tableSelect, 0, sizeof(bool) * definition.numTables);
 
   // tables can contain more tables, so recurse each node again
@@ -405,6 +418,7 @@ io_error:
 void ConeScan::Init(void)
 {
   memset(&definition, 0, sizeof(struct Definition));
+  memset(&uds_transfer, 0, sizeof(struct UDSRequestDownload));
   memset(&db, 0, sizeof(struct ConeScanDB));
   conescan_db_open(&db, db_path);
   console.AddLog("loaded database %s", db_path);
@@ -445,6 +459,7 @@ void ConeScan::Init(void)
   if (rc) {
       console.AddLog("ERROR: j2534 init fail");
       j2534InitOK = false;
+      mem_edit.Open = false;
   }
   else {
       j2534InitOK = true;
@@ -701,7 +716,7 @@ void RenderMenu(bool* exit_requested)
 
       if(definition.xmlid == NULL) {
         if (ImGui::MenuItem("Open metadata file", NULL)) {
-          char* tmp = getFileOpenPath();
+          char* tmp = getFileOpenPath(NULL, false);
           if(tmp) {
             int len = strlen(tmp);
             if(len > 0) {
@@ -748,7 +763,7 @@ void RenderMenu(bool* exit_requested)
 
       if(romFilePath == NULL) {
         if (ImGui::MenuItem("Open ROM file", NULL)) {
-          char* tmp = getFileOpenPath();
+            char* tmp = getFileOpenPath(NULL , true);
           if(tmp) {
             int len = strlen(tmp);
             if(len > 0) {
@@ -798,6 +813,58 @@ void RenderMenu(bool* exit_requested)
       if(ImGui::MenuItem("Quit", NULL)) *exit_requested = true;
       ImGui::EndMenu();
     }
+
+    if (ImGui::BeginMenu("ECU")) {
+        
+        bool allowSaveRom = false;
+        if (uds_transfer.payload && (uds_transfer.downloadinProgress == false)) allowSaveRom = true;
+
+        if (ImGui::MenuItem("Save Rom", NULL, false, allowSaveRom)) {
+            //uds_transfer.payload
+            assert(vin);
+            assert(calID);
+            assert(uds_transfer.payload);
+
+            char* defaultFileName = (char*)malloc(strlen(vin) + strlen(calID) + 6);
+            char  fullPath[PATH_MAX] = { 0 };
+            FILE* outFile = NULL;
+
+            assert(defaultFileName);
+            memset(defaultFileName, 0, strlen(vin) + strlen(calID) + 6);
+            strncpy(defaultFileName, vin, strlen(vin));
+            defaultFileName[strlen(vin)] = '-';
+            strncpy(defaultFileName + strlen(vin) + 1, calID, strlen(calID));
+            strncpy(defaultFileName + strlen(vin) + 1 + strlen(calID), ".bin\0", 4);
+
+            char* path = getFileOpenPath(NULL, true);
+            if (!path) goto cleanup;
+
+            //int pathLen = strlen(path) + strlen(defaultFileName) + 1;
+            strncpy(fullPath, path, strlen(path));
+#if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
+            fullPath[strlen(path)] = '\\';
+#else
+            fullPath[strlen(path)] = '/';
+#endif
+            strncpy(fullPath + strlen(path) + 1, defaultFileName, strlen(defaultFileName));
+
+            int rc;
+            console.AddLog("[UDS] Saving transfer to %s (default='%s')", path, defaultFileName);
+            outFile = fopen(fullPath, "wb");
+            
+            if (!outFile) goto cleanup;
+            rc = fwrite(uds_transfer.payload, 1, uds_transfer.transferBytes, outFile);
+            if (rc != 1) goto cleanup;
+            
+            fflush(outFile);
+            console.AddLog("[UDS] Transfer saved to %s", path);
+        cleanup:
+            if (outFile) fclose(outFile);
+            if (path) free(path);
+            if (defaultFileName) free(defaultFileName);
+        }
+        ImGui::EndMenu();
+    }
     ImGui::EndMainMenuBar();
   }
 }
@@ -842,6 +909,18 @@ void RenderConnection()
               console.AddLog("Got CALID: %s", calID);
           }
       }
+      // don't display these unless the VIN is loaded
+      // probably need a better way off handling this
+      if (vin) {
+        ImGui::SameLine();
+        if (ImGui::Button("Download ROM")) {
+            uds_transfer.startAddress = 0;
+            uds_transfer.transferSize = 0x80000;
+            uds_transfer.transferChunkSize = 0x100;
+            uds_request_start_download(ecu, &uds_transfer, &console);
+            mem_edit.Open = true;
+        }
+      }
     }
     ImGui::Separator();
 
@@ -857,6 +936,21 @@ void RenderConnection()
         ImGui::SameLine();
         ImGui::Text("SW%s", calID);
     }
+    ImGui::Separator();
+
+    ImGui::ProgressBar(uds_transfer.transferProgress, ImVec2(0.0f, 0.0f));
+    ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+    ImGui::Text("Transfer Progress %0.2F", uds_transfer.transferProgress);
+    if (uds_transfer.payload) {
+        if(mem_edit.Open)
+            mem_edit.DrawWindow("Rom Memory Editor", uds_transfer.payload, uds_transfer.transferBytes);
+
+        if (mem_edit.Open == false) {
+            uds_transfer.downloadinProgress = false;
+        }
+    }
+
+
   ImGui::End();
 }
 
@@ -883,6 +977,7 @@ void ConeScan::RenderUI(bool* exit_requested)
 void ConeScan::Cleanup()
 {
   printf("starting cleanup\n");
+  uds_request_complete(&uds_transfer);
   closeMetadataFile();
   int layoutID = 0;
   if(iniData) {
@@ -898,6 +993,7 @@ void ConeScan::Cleanup()
     j2534.PassThruClose(devID);
     j2534.PassThruDisconnect(chanID);
   }
+
 }
 
 size_t j2534Initialize()

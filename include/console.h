@@ -1,5 +1,7 @@
 #pragma once
 
+#include "imgui.h"
+
 #include "conescan_db.h"
 
 namespace ConeScan {
