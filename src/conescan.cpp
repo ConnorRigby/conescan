@@ -3,7 +3,6 @@
 
 #include "imgui.h"
 #include "imgui_memory_editor.h"
-#include "tinyxml2.h"
 
 #if defined(_WIN32) || defined(WIN32) || defined (_WIN64) || defined (WIN64)
 #include <tchar.h>
@@ -21,18 +20,17 @@
 #include <errno.h>
 
 #ifdef WASM
-// nothing to see here
 #include "emscripten.h"
-#else
-#include "nfd.h"
 #endif
 
 #include "conescan.h"
 #include "conescan_db.h"
 #include "history.h"
 #include "definition.h"
+#include "definition_parse.h"
 #include "console.h"
 #include "layout.h"
+#include "file_open_dialog.h"
 
 //#define OP20PT32_USE_LIB
 #include "J2534.h"
@@ -47,324 +45,139 @@ const char* db_path = "/conescan/conescan.db";
 const char* db_path = "conescan.db";
 #endif
 
+// memory editor for a UDS transfer
+static MemoryEditor mem_edit;
+
+// memory editor for the rom editor
+static MemoryEditor rom_edit;
+
+// console window has logs and other information
+// enabled by default, but not active
+static ConeScan::Console console;
+bool show_console_window = true;
+
+// demo window is for the IMGui window
+bool show_demo_window = false;
+
+// sqlite database handle
 struct ConeScanDB db;
 
+// for saving/loading layout
+// this buffer gets saved into the database
+const char* iniData = NULL;
+size_t iniSize = 0;
+
+// J2534 interface
+static unsigned long devID, chanID;
+static const unsigned int CAN_BAUD = 500000;
 J2534 j2534;
 size_t j2534Initialize();
-
 bool j2534InitOK = false;
 char dllName[PATH_MAX] = { 0 };
 char apiVersion[255] = { 0 };
 char dllVersion[255] = { 0 };
 char firmwareVersion[255] = { 0 };
 
+// J2534 -> UDS interface
 RX8* ecu;
 char* vin;
 char* calID;
 struct UDSRequestDownload uds_transfer;
 
-static unsigned long devID, chanID;
-static const unsigned int CAN_BAUD = 500000;
-
+// binary file for holding the ROM
+// this buffer can be modified with the
+// [rom_edit] editor
 char* romFilePath = NULL;
 unsigned char* romFile = NULL;
 long romFileLength = 0;
-char* metadataFilePath = NULL;
 
+// ROM layout
 struct Definition definition;
-tinyxml2::XMLDocument* metadataFile = NULL;
 
-static ConeScan::Console console;
-static MemoryEditor mem_edit;
-static MemoryEditor rom_edit;
-bool show_console_window = true;
-bool show_demo_window = false;
+// Handles Parsing definitions
+struct DefinitionParse definition_parse;
 
-// stores opened table editors
+/* Holds bools for each table */
 bool* tableSelect = NULL;
 
-// double pointer buffer, each has number of elements
+/* Holds one bool per cell in every table
+ * when the metadata file is opened, we count
+ * the number of cells in every table,
+ * then allocate one giant block for every
+ * cell. */
 bool* cellSelect = NULL;
 int numCells = 0;
 
+// All path history buffers will be at max this long
 int pathHistoryMax = 5;
 
+// holds up to [pathHistoryMax] strings
+char** metadataFilePathHistory = NULL;
 int metadataHistoryCount = 0;
-char **metadataFilePathHistory;
 
-int romHistoryCount = 0;
+// holds up to [pathHistoryMax] strings
 char **romFilePathHistory;
+int romHistoryCount = 0;
 
-// for saving/loading layout
-const char *iniData = NULL;
-size_t iniSize = 0;
-
-char* getFileOpenPath(char* defaultPath, bool save) 
-#ifdef WASM
+void addMetadataFileToHistory(char* metadataFilePath)
 {
-  return "/metadata/lfg2ee.xml";
-}
-#else
-{
-  nfdchar_t *outPath = NULL;
-  nfdresult_t result;
-  if (save) {
-      result = NFD_PickFolder(NULL, &outPath);
-  }
-  else {
-      result = NFD_OpenDialog(NULL, NULL, &outPath);
-  }
-      
-  if (result == NFD_OKAY) {
-    return outPath;
-  } else if (result == NFD_CANCEL) {
-    fprintf(stderr, "User pressed cancel.");
-    return NULL;
-  }
-
-  printf("Error: %s\n", NFD_GetError());
-  return NULL;
-}
-#endif
-
-void closeMetadataFile() 
-{
-  if(metadataFile) {
-    delete metadataFile;
-    metadataFile = NULL;
-  }
-  if(metadataFilePath) {
-    free(metadataFilePath);
-    metadataFilePath = NULL;
-  }
-  definition_deinit(&definition);
-  memset(&definition, 0, sizeof(struct Definition));
-  console.AddLog("Closed metadata");
-}
-
-void loadScaling(struct Scaling* scaling, tinyxml2::XMLElement * xml)
-{
-  if(xml == NULL) return;
-  if(scaling == NULL) return;
-
-  const char* name = xml->Attribute("name");
-
-  definition_scaling_add_string_value(
-    &scaling->name, 
-    name
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->units, 
-    xml->Attribute("units")
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->toexpr, 
-    xml->Attribute("toexpr")
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->frexpr, 
-    xml->Attribute("frexpr")
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->format, 
-    xml->Attribute("format")
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->storagetype, 
-    xml->Attribute("storagetype")
-  );
-
-  definition_scaling_add_string_value(
-    &scaling->endian, 
-    xml->Attribute("endian")
-  );
-
-  scaling->min = xml->FloatAttribute("min");
-  scaling->max = xml->FloatAttribute("max");
-  scaling->inc = xml->FloatAttribute("inc");
-}
-
-void loadScalings(tinyxml2::XMLNode *rom)
-{
-  tinyxml2::XMLElement *scaling;
-  scaling = rom->FirstChildElement("scaling");
-  while(scaling) {
-    definition.numScalings +=1;
-    scaling = scaling->NextSiblingElement("scaling");
-  }
-  console.AddLog("Processing %d scalings", definition.numScalings);
-  definition_new_scalings(&definition);
-
-  scaling = rom->FirstChildElement("scaling");
-  int index = 0;
-  while(scaling) {
-    const char* name = scaling->Attribute("name");
-    if(name == NULL) {
-      console.AddLog("[error] Invalid scaling: missing name");
+    bool addToHistory = true;
+    for (int i = 0; i < metadataHistoryCount; i++) {
+        if (strcmp(metadataFilePathHistory[i], metadataFilePath) == 0)
+            addToHistory = false;
     }
-    loadScaling(&definition.scalings[index], scaling);
-
-    scaling = scaling->NextSiblingElement("scaling");
-    index+=1;
-  }
+    if (addToHistory) {
+        printf("adding %s to history\n", metadataFilePath);
+        conescan_db_add_history(&db, "Definition", metadataFilePath);
+        printf("added %s to history\n", metadataFilePath);
+        conescan_db_load_history(&db, "Definition", pathHistoryMax, metadataFilePathHistory, &metadataHistoryCount);
+        console.AddLog("added entry to history%s", metadataFilePath);
+    }
 }
 
-void loadTable(struct Table* table, tinyxml2::XMLElement *xml)
+void addRomFileToHistory(char* rormFilePath)
 {
-  // sanity checks
-  if(table == NULL) return;
-  if(xml == NULL) return;
-  if(definition.scalings == NULL) return;
+    bool addToHistory = true;
 
-  const char* address_string = xml->Attribute("address");
-  table->address = strtol(address_string, NULL, 16);
-  table->level = xml->IntAttribute("level");
-  table->elements = xml->IntAttribute("elements");
-  definition_scaling_add_string_value(&table->name, xml->Attribute("name"));
-  definition_scaling_add_string_value(&table->type, xml->Attribute("type"));
-  definition_scaling_add_string_value(&table->category, xml->Attribute("category"));
-  definition_scaling_add_string_value(&table->scaling, xml->Attribute("scaling"));
-  assert(table->scaling);
-  for(int i = 0; i < definition.numScalings; i++) {
-    if(strcmp(table->scaling, definition.scalings[i].name) == 0) {
-      table->Scaling = &definition.scalings[i];
-      break;
+    for (int i = 0; i < romHistoryCount; i++) {
+        if (strcmp(romFilePathHistory[i], romFilePath) == 0)
+            addToHistory = false;
     }
-  }
-  if(table->Scaling == NULL) {
-    console.AddLog("Could not locate scaling for table %s", table->name);
-  }
+    if (addToHistory) {
+        printf("adding %s to history\n", romFilePath);
+        conescan_db_add_history(&db, "Rom", romFilePath);
+        printf("added %s to history\n", romFilePath);
+        conescan_db_load_history(&db, "Rom", pathHistoryMax, romFilePathHistory, &romHistoryCount);
+        console.AddLog("added rom entry to history %s", romFilePath);
+    }
 }
 
-void loadTables(tinyxml2::XMLNode *rom)
+void initSelects()
 {
-  int index = 0;
-  int jndex = 0;
-  tinyxml2::XMLElement *table;
-  definition.numTables = 0;
-  table = rom->FirstChildElement("table");
-  while(table) {
-    definition.numTables +=1;
-    table = table->NextSiblingElement("table");
-  }
-  console.AddLog("Processing %d tables", definition.numTables);
-  cellSelect;
-  numCells = 0;
-  definition_new_tables(&definition.tables, definition.numTables);
-  if(tableSelect) {
-    free(tableSelect);
-    tableSelect = NULL;
-  }
-  tableSelect = (bool*)malloc(sizeof(bool) * definition.numTables);
-  assert(tableSelect);
-  memset(tableSelect, 0, sizeof(bool) * definition.numTables);
-
-  // tables can contain more tables, so recurse each node again
-  // also assign scaling
-
-  table = rom->FirstChildElement("table");
-  index = 0;
-  while(table) {
-    tinyxml2::XMLElement *Subtable;
-    Subtable = table->FirstChildElement("table");
-    // definition.tables[index].numTables = 0;
-    while(Subtable) {
-      definition.tables[index].numTables+=1;
-      Subtable = Subtable->NextSiblingElement("table");
-    }
-    definition_new_tables(&definition.tables[index].tables, definition.tables[index].numTables);
-
-    table = table->NextSiblingElement("table");
-    index+=1;
-  }
-
-  // itterate them again now that they're allocated
-  table = rom->FirstChildElement("table");
-  index = 0;
-  jndex = 0;
-  while(table) {
-    loadTable(&definition.tables[index], table);
-    numCells += definition.tables[index].elements;
-    tinyxml2::XMLElement *Subtable;
-    Subtable = table->FirstChildElement("table");
-    jndex = 0;
-    while(Subtable) {
-      loadTable(&definition.tables[index].tables[jndex], Subtable);
-      numCells += definition.tables[index].tables[jndex].elements;
-      jndex +=1;
-      Subtable = Subtable->NextSiblingElement("table");
-    }
-    index+=1;
-    table = table->NextSiblingElement("table");
-  }
-  cellSelect = (bool*)malloc(sizeof(bool) * numCells);
-  assert(cellSelect);
-  memset(cellSelect, 0, sizeof(bool) * numCells);
+    assert(tableSelect == NULL);
+    assert(cellSelect == NULL);
+    assert(definition.numTables);
+    
+    tableSelect = (bool*)malloc(sizeof(bool) * definition.numTables);
+    assert(tableSelect);
+    memset(tableSelect, 0, sizeof(bool) * definition.numTables);
+    
+    numCells = definition_count_cells(&definition);
+    cellSelect = (bool*)malloc(sizeof(bool) * numCells);
+    assert(cellSelect);
+    memset(cellSelect, 0, sizeof(bool) * numCells);
 }
 
-void loadMetadataFile(void) 
+void deinitSelects()
 {
-  if(metadataFilePath == NULL) {
-    if(metadataFile) delete metadataFile;
-    return;
-  }
-
-  if(metadataFile == NULL) {
-    metadataFile = new tinyxml2::XMLDocument();
-  }
-  printf("loading definition file %s\n", metadataFilePath);
-  console.AddLog("loading definition file %s\n", metadataFilePath);
-  if(metadataFile->LoadFile(metadataFilePath) != tinyxml2::XML_SUCCESS) {
-    console.AddLog("Failed to open metadata file %s\n", metadataFile->ErrorStr());
-    closeMetadataFile();
-    return;
-  }
-  printf("opened definition file %s\n", metadataFilePath);
-  console.AddLog("Opened %s\n", metadataFilePath);
-  tinyxml2::XMLElement *def;
-  def = metadataFile->RootElement();
-  tinyxml2::XMLNode *node;
-  tinyxml2::XMLNode *rom;
-  tinyxml2::XMLNode *romID;
-
-  if(strcmp(def->Name(), "roms") == 0) {
-    rom = def->FirstChildElement("rom");
-    if(rom == NULL) {
-      fprintf(stderr, "invalid metadata\n");
+    if (tableSelect) {
+        free(tableSelect);
+        tableSelect = NULL;
     }
-    romID = rom->FirstChildElement("romid");
-    node = romID->FirstChild();
-    while(node) {
-      const char* nodeName = node->Value();
-      tinyxml2::XMLNode* nodeValue = node->FirstChild();
-      if(nodeValue)
-        definition_add_value(&definition, nodeName, nodeValue->Value());
-
-      node = node->NextSiblingElement();
+    if (cellSelect) {
+        free(cellSelect);
+        cellSelect = NULL;
     }
-    console.AddLog("metadata xmlid = %s", definition.xmlid);
-    loadScalings(rom);
-    loadTables(rom);
-    delete metadataFile;
-    metadataFile = NULL;
-  }
-  bool addToHistory = true;
-  for(int i = 0; i < metadataHistoryCount; i++) {
-    if(strcmp(metadataFilePathHistory[i], metadataFilePath) == 0)
-      addToHistory = false;
-  }
-  if(addToHistory) {
-    printf("adding %s to history\n", metadataFilePath);
-    conescan_db_add_history(&db, "Definition", metadataFilePath);
-    printf("added %s to history\n", metadataFilePath);
-    conescan_db_load_history(&db, "Definition", pathHistoryMax, metadataFilePathHistory, &metadataHistoryCount);
-    console.AddLog("added entry to history%s", metadataFilePath);
-  }  
 }
 
 void closeRomFile()
@@ -375,8 +188,23 @@ void closeRomFile()
   }
   if(romFilePath) {
     free(romFilePath);
-    romFile = NULL;
+    romFilePath = NULL;
   }
+}
+
+bool setRomFilePath(char* path)
+{
+    assert(path);
+
+    int len = strlen(path);
+    if (len > 0) {
+        romFilePath = (char*)malloc(len + 1);
+        assert(romFilePath);
+        memset(romFilePath, 0, len + 1);
+        strncpy(romFilePath, path, len);
+        return true;
+    }
+    return false;
 }
 
 void loadRomFile(void)
@@ -386,7 +214,6 @@ void loadRomFile(void)
     free(romFile);
     romFile = NULL;
   }
-  bool addToHistory = true;
 
   FILE* fp = fopen(romFilePath, "rb");
   int length = 0;
@@ -403,23 +230,12 @@ void loadRomFile(void)
   rewind(fp);
 
   romFile = (unsigned char*)malloc(length);
+  assert(romFile);
   romFileLength = length;
   if(!romFile) goto io_error;
   fread(romFile, 1, length, fp);
   console.AddLog("Read %d bytes from %s", length, romFilePath);
-
-  for(int i = 0; i < romHistoryCount; i++) {
-    if(strcmp(romFilePathHistory[i], romFilePath) == 0)
-      addToHistory = false;
-  }
-  if(addToHistory) {
-    printf("adding %s to history\n", romFilePath);
-    conescan_db_add_history(&db, "Rom", romFilePath);
-    printf("added %s to history\n", romFilePath);
-    conescan_db_load_history(&db, "Rom", pathHistoryMax, romFilePathHistory, &romHistoryCount);
-    console.AddLog("added rom entry to history %s", romFilePath);
-  }  
-
+  addRomFileToHistory(romFilePath);
   return;
 
 io_error:
@@ -432,9 +248,15 @@ io_error:
 void ConeScan::Init(void)
 {
   memset(&definition, 0, sizeof(struct Definition));
+  memset(&definition_parse, 0, sizeof(struct DefinitionParse));
+  definition_parse.console = &console;
+  definition_parse.metadataFile = NULL;
+  definition_parse.metadataFilePath = NULL;
+
   memset(&uds_transfer, 0, sizeof(struct UDSRequestDownload));
   memset(&db, 0, sizeof(struct ConeScanDB));
   conescan_db_open(&db, db_path);
+
   console.AddLog("loaded database %s", db_path);
 
   iniSize = conescan_db_load_layout(&db, 1, &iniData);
@@ -588,7 +410,7 @@ void Render2DTable(struct Table* table)
   if(ImGui::BeginTable("2D Table", x->elements+1, tableflags)) {
     unsigned long x_axis_address = x->address;
     unsigned long d_axis_address = table->address;
-    float output;
+    float output = 0.0;
     // X header
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 100.0f);
     for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
@@ -701,7 +523,6 @@ void Render3DTable(struct Table* table, bool* cellSelectIndex)
 void RenderTables()
 {
   if (ImGui::TreeNode("Tables")) {
-    
     for(int i = 0; i < definition.numTables; i++) {
       if(romFile) {
         ImGui::Selectable(definition.tables[i].name, &tableSelect[i]);
@@ -714,17 +535,13 @@ void RenderTables()
 
   // TODO: load into categories
   long j = 0;
-  assert(cellSelect);
+  //assert(cellSelect);
   for(int i = 0; i < definition.numTables; i++) {
     if(tableSelect[i]) {
       ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
       char buf[64];
       sprintf(buf, "Table Editor #%2d", i);
-
-      if (!ImGui::Begin(buf, &tableSelect[i])) {
-        // ImGui::End();
-      }
-
+      ImGui::Begin(buf, &tableSelect[i]);
       if (ImGui::BeginPopupContextItem())
       {
           if (ImGui::MenuItem("Close"))
@@ -762,20 +579,18 @@ void RenderMenu(bool* exit_requested)
         if (ImGui::MenuItem("Open metadata file", NULL)) {
           char* tmp = getFileOpenPath(NULL, false);
           if(tmp) {
-            int len = strlen(tmp);
-            if(len > 0) {
-              metadataFilePath = (char*)malloc(len+1);
-              assert(metadataFilePath);
-              memset(metadataFilePath, 0 , len+1);
-              strncpy(metadataFilePath, tmp, len);
-            }
+            setMetadataFilePath(&definition_parse, tmp);
             free(tmp);
-            loadMetadataFile();
+            if (loadMetadataFile(&definition_parse, &definition)) {
+                addMetadataFileToHistory(definition_parse.metadataFilePath);
+                initSelects();
+            }
           } 
         }
       } else {
         if (ImGui::MenuItem("close metadata file", NULL)) {
-          closeMetadataFile();
+          closeMetadataFile(&definition_parse, &definition);
+          deinitSelects();
         }
       }
       ImGui::Separator();
@@ -785,47 +600,35 @@ void RenderMenu(bool* exit_requested)
       for(int i = 0; i < metadataHistoryCount; i++) {
         assert(metadataFilePathHistory[i]);
         if(ImGui::MenuItem(metadataFilePathHistory[i], NULL)) {
-          if(metadataFile) closeMetadataFile();
-          definition_deinit(&definition);
-          memset(&definition, 0, sizeof(struct Definition));
-          if(metadataFilePath) {
-            free(metadataFilePath);
-            metadataFilePath = NULL;
-          }
-          int len = strlen(metadataFilePathHistory[i]);
-          if(len > 0) {
-            metadataFilePath = (char*)malloc(len + 1);
-            assert(metadataFilePath);
-            memset(metadataFilePath, 0, len+1);
-            strncpy(metadataFilePath, metadataFilePathHistory[i], len);
-            loadMetadataFile();
+          // close the file if it was open
+          closeMetadataFile(&definition_parse, &definition);
+          deinitSelects();
+          setMetadataFilePath(&definition_parse, metadataFilePathHistory[i]);
+          if (loadMetadataFile(&definition_parse, &definition)) {
+              initSelects();
           }
         }
       }
+
       ImGui::Separator();
       ImGui::MenuItem("Load ROM", NULL, false, false);
 
       if(romFilePath == NULL) {
         if (ImGui::MenuItem("Open ROM file", NULL)) {
+            closeRomFile();
             char* tmp = getFileOpenPath(NULL , false);
-          if(tmp) {
-            int len = strlen(tmp);
-            if(len > 0) {
-              romFilePath = (char*)malloc(len+1);
-              assert(romFilePath);
-              memset(romFilePath, 0 , len+1);
-              strncpy(romFilePath, tmp, len);
+            if (tmp) {
+                if (setRomFilePath(tmp)) {
+                    loadRomFile();
+                    addRomFileToHistory(romFilePath);
+                    loadRomFile();
+                }
+                free(tmp);
             }
-            free(tmp);
-            loadRomFile();
           } 
-        }
       } else {
         if (ImGui::MenuItem("Close ROM file", NULL)) {
-          free(romFilePath);
-          romFilePath = NULL;
-          free(romFile);
-          romFile = NULL;
+            closeRomFile();
         }
       }
 
@@ -834,19 +637,9 @@ void RenderMenu(bool* exit_requested)
       for(int i = 0; i < romHistoryCount; i++) {
         assert(romFilePathHistory[i]);
         if(ImGui::MenuItem(romFilePathHistory[i], NULL)) {
-          if(romFilePath) {
-            if(romFile) closeRomFile();
-            free(romFilePath);
-            romFilePath = NULL;
-          }
-          int len = strlen(romFilePathHistory[i]);
-          if(len > 0) {
-            romFilePath = (char*)malloc(len + 1);
-            assert(romFilePath);
-            memset(romFilePath, 0, len+1);
-            strncpy(romFilePath, romFilePathHistory[i], len);
-            loadRomFile();
-          }
+            closeRomFile();
+            if(setRomFilePath(romFilePathHistory[i]))
+                loadRomFile();
         }
       }
 
@@ -854,12 +647,26 @@ void RenderMenu(bool* exit_requested)
 
       if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;
       if(ImGui::MenuItem("Show Console", NULL)) show_console_window = true;
+
+      ImGui::Separator();
+      if (ImGui::MenuItem("Delete History", NULL)) {
+          conescan_db_purge_history(&db);
+          for (int i = 0; i < pathHistoryMax; i++) {
+              if (metadataFilePathHistory[i]) {
+                  memset(metadataFilePathHistory[i], 0, sizeof(char) * PATH_MAX);
+              }
+              if (romFilePathHistory[i]) {
+                  memset(romFilePathHistory[i], 0, sizeof(char) * PATH_MAX);
+              }
+          }
+          metadataHistoryCount = 0;
+          romHistoryCount = 0;
+      }
       if(ImGui::MenuItem("Quit", NULL)) *exit_requested = true;
       ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("ECU")) {
-        
         bool allowSaveRom = false;
         if (uds_transfer.payload && (uds_transfer.downloadinProgress == false)) allowSaveRom = true;
 
@@ -924,7 +731,7 @@ void RenderConnection()
     if (ImGui::BeginPopupContextItem())
     {
         if (ImGui::MenuItem("Close")) {
-
+            assert(false); // fixme
         }
         ImGui::EndPopup();
     }
@@ -1032,9 +839,9 @@ void ConeScan::RenderUI(bool* exit_requested)
 
 void ConeScan::Cleanup()
 {
-  printf("starting cleanup\n");
   uds_request_complete(&uds_transfer);
-  closeMetadataFile();
+  closeMetadataFile(&definition_parse, &definition);
+  deinitSelects();
   int layoutID = 0;
   if(iniData) {
     // if ini data was loaded, assume we are using layout 1 for now
@@ -1049,7 +856,6 @@ void ConeScan::Cleanup()
     j2534.PassThruClose(devID);
     j2534.PassThruDisconnect(chanID);
   }
-
 }
 
 size_t j2534Initialize()

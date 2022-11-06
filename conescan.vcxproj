@@ -164,6 +164,8 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
     <ClCompile Include="src\conescan_db.cpp" />
     <ClCompile Include="src\console.cpp" />
     <ClCompile Include="src\definition.cpp" />
+    <ClCompile Include="src\definition_parse.cpp" />
+    <ClCompile Include="src\file_open_dialog.cpp" />
     <ClCompile Include="src\history.cpp" />
     <ClCompile Include="src\layout.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -176,6 +178,8 @@ xcopy /y "$(ProjectDir)conescan.db" "$(OutDir)"</Command>
     <ClInclude Include="include\conescan_db.h" />
     <ClInclude Include="include\console.h" />
     <ClInclude Include="include\definition.h" />
+    <ClInclude Include="include\definition_parse.h" />
+    <ClInclude Include="include\file_open_dialog.h" />
     <ClInclude Include="include\history.h" />
     <ClInclude Include="include\imgui_memory_editor.h" />
     <ClInclude Include="include\layout.h" />

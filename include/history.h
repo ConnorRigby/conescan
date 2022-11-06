@@ -4,3 +4,4 @@
 
 void conescan_db_load_history(struct ConeScanDB* db, const char* type, int max, char** data, int* count);
 void conescan_db_add_history(struct ConeScanDB* db, const char* type, char* path);
+void conescan_db_purge_history(struct ConeScanDB* db);

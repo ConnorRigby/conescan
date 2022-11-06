@@ -248,3 +248,18 @@ void definition_deinit(struct Definition* definition)
     definition->scalings = NULL;
   }
 }
+
+unsigned long definition_count_cells(struct Definition* definition)
+{
+    unsigned long numCells = 0;
+    struct Table* table;
+    for (int i = 0; i < definition->numTables; i++) {
+        numCells += definition->tables[i].elements;
+        if (definition->tables[i].tables) {
+            for (int j = 0; j < definition->tables[i].numTables; j++) {
+                numCells += definition->tables[i].tables[j].elements;
+            }
+        }
+    }
+    return numCells;
+}

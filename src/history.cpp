@@ -17,6 +17,7 @@ void conescan_db_load_history(struct ConeScanDB* db, const char* type, int max, 
   assert(rc == SQLITE_OK);
   *count = 0;
   for(int i = 0; i < max; i++)  {
+    assert(data[i]);
     data[i][0] = '\0';
   }
   do {
@@ -46,4 +47,17 @@ void conescan_db_add_history(struct ConeScanDB* db, const char* type, char* path
   rc = sqlite3_step(query);
   assert(rc == SQLITE_DONE);
   sqlite3_finalize(query);
+}
+
+void conescan_db_purge_history(struct ConeScanDB* db)
+{
+    sqlite3_stmt* stmt;
+    int rc;
+    rc = sqlite3_prepare_v2(db->db, "DELETE from 'history';", -1, &stmt, 0);
+    assert(rc == SQLITE_OK);
+    do {
+        rc = sqlite3_step(stmt);
+    } while (rc == SQLITE_ROW);
+    assert(rc == SQLITE_DONE);
+    sqlite3_finalize(stmt);
 }

@@ -93,6 +93,8 @@ SOURCES += src/conescan_db.cpp
 SOURCES += src/history.cpp
 SOURCES += src/layout.cpp
 SOURCES += src/uds_request_download.cpp
+SOURCES += src/file_open_dialog.cpp
+SOURCES += src/definition_parse.cpp
 
 ##---------------------------------------------------------------------
 ## OPENGL ES

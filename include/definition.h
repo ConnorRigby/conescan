@@ -67,4 +67,6 @@ void definition_new_tables(struct Table** tables, int count);
 
 void definition_deinit(struct Definition* definition);
 
-bool loadScalingValue(struct Scaling* scaling, char* rom, scaled_value_t* value);
+//bool loadScalingValue(struct Scaling* scaling, char* rom, scaled_value_t* value);
+
+unsigned long definition_count_cells(struct Definition* definition);
