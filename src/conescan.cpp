@@ -334,6 +334,10 @@ void ConeScan::Init(void)
   }
 
   rom_edit.Open = false;
+  rom_edit.HighlightColor = ImColor(0x1f1f1ffe);
+  rom_edit.OptShowDataPreview = true;
+  rom_edit.PreviewDataType = ImGuiDataType_Float;
+  rom_edit.PreviewEndianess = 1;
 }
 
 void RenderDefinitionInfo()
@@ -478,79 +482,101 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
   assert(romFile);
   assert(table);
   assert(table->numTables == 2);
-  struct Table* x = &table->tables[0];
-  struct Table* y = &table->tables[1];
-  
+  struct Table* x;
+  struct Table* y;
+  if(table->swapxy) {
+    x = &table->tables[1];
+    y = &table->tables[0];
+  } else {
+    x = &table->tables[0];
+    y = &table->tables[1];
+  }
+  assert(x->elements == 10);
+  assert(y->elements == 18);
+  char buffer[120] = {0};
+
   // Using those as a base value to create width/height that are factor of the size of our font
-  // const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("7.70").x;
+  const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("777.777").x;
   const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
 
   static ImGuiTableFlags tableflags = ImGuiTableFlags_Borders | ImGuiTableFlags_NoBordersInBodyUntilResize;
 
-  if (ImGui::BeginTable("3D Table",  x->elements+1, tableflags)) {
-    unsigned long x_axis_address = x->address;
-    unsigned long y_axis_address = y->address;
-    unsigned long d_axis_address = table->address;
-    
-    // X header
-    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-    cellIndex += sizeof(struct cellState);
-    for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
-      char buffer[50] = {0};
-      tableCopyF32(&cellIndex->value.f32, romFile, x_axis_address);
-      
-      assert(x->Scaling);
-      sprintf(buffer, x->Scaling->format, cellIndex->value.f32);
+  unsigned long x_axis_address = x->address;
+  unsigned long y_axis_address = y->address;
+  unsigned long d_axis_address = table->address;
+  unsigned long base = table->address;
+  ImGui::Text("Table Def: data=%04X X=%04X Y=%04X", d_axis_address, x_axis_address, y_axis_address);
 
-      //ImGui::Text(buffer);
-      //ImGui::InputFloat(buffer, &cellIndex->value.f32);
-      ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, 50.0f);
+  sprintf(buffer, "[3D] %s", table->name);
+  if (ImGui::BeginTable(buffer,  x->elements+1, tableflags)) {
+    // build X header
+
+    // 0,0
+    sprintf(buffer, "##-%s-x0", table->name);
+    ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH);
+    cellIndex += sizeof(struct cellState);
+
+    // 0,1 - 0,xelements
+    for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
+      tableCopyF32(&cellIndex->value.f32, romFile, x_axis_address);
+      assert(x->Scaling);
+
+      // 0,xi
+      sprintf(buffer, "%0.2F##3d-x-%d", cellIndex->value.f32, xi);
+      ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH);
       cellIndex += sizeof(struct cellState);
     }
     ImGui::TableHeadersRow();
-    
-    for(int yi = 1,f=0; yi < y->elements+1; yi++,f++) {
-      float min_row_height = (float)(int)(TEXT_BASE_HEIGHT * 0.30f);
+
+    float min_row_height = (float)(int)(TEXT_BASE_HEIGHT * 0.30f);
+    // 1,0 - yelements,xelements
+    for(int yi = 1, yo=0; yi < y->elements+1; yi++, yo++) {
       ImGui::TableNextRow(ImGuiTableRowFlags_None, min_row_height);
 
+      // first column in yi
       ImGui::TableSetColumnIndex(0);
       ImU32 row_bg_color = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.65f));
       ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, row_bg_color);
       tableCopyF32(&cellIndex->value.f32, romFile, y_axis_address);
-      char buf[32];
-      sprintf(buf, y->Scaling->format, cellIndex->value.f32);
-      ImGui::PushID(yi);
-      ImGui::Selectable(buf, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
-      //ImGui::InputFloat("", &output);
-      //ImGui::InputFloat(buf, &output);
-
+      sprintf(buffer, "%0.2F##3d-y-%d", cellIndex->value.f32, yi);
+      ImGui::Selectable(buffer, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
       if (cellIndex->selected) {
-          //rom_edit.HighlightColor = ImGui
-          rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
-          //cellIndex->selected = false;
+          rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address+ 4);
+          cellIndex->selected = false;
+          console.AddLog("selected row 0x%04X-0x%04X", y_axis_address, y_axis_address+ 4);
       }
-      ImGui::PopID();
-      y_axis_address+=4;
-      cellIndex += sizeof(struct cellState);
 
-      for(int xi = 1, g=0, x_axis_address=x->address; xi < x->elements+1; xi++,g++,x_axis_address+=4,d_axis_address+=4) {
+      cellIndex += sizeof(struct cellState);
+      y_axis_address+=4;
+
+      // for the remaining data cells after the first column
+      unsigned long lastBase = base;
+      for(int xi = 1; 
+              xi < x->elements+1; 
+              xi++)
+      {
         ImGui::TableSetColumnIndex(xi);
-        tableCopyF32(&cellIndex->value.f32, romFile, y_axis_address);
-        //ImGui::Text(y->Scaling->format, output);
-        assert(y->Scaling);
-        char buf[32];
-        sprintf(buf, "###%d%d", yi, xi);
-        //sprintf(buf, y->Scaling->format, cellIndex->value.f32);
-        ImGui::PushID(xi);
-        //ImGui::Selectable(buf, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
-        ImGui::InputFloat(buf, &cellIndex->value.f32);
-        ImGui::PopID();
-        if (cellIndex->selected) {
-            //rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
-            //cellIndex->selected = false;
+        tableCopyF32(&cellIndex->value.f32, romFile, base);
+        sprintf(buffer, "%0.2F##3d-xy-%d%d", cellIndex->value.f32, xi, yi);
+        ImU32 cell_bg_color;
+        if(cellIndex->value.f32 < 33.33) {
+         cell_bg_color = ImGui::GetColorU32(ImVec4(0.0f, 0.8f, 0.0f, 0.65f));
+        } else if(cellIndex->value.f32 < 66.66) {
+         cell_bg_color = ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.8f, 0.65f));
+        } else {
+         cell_bg_color = ImGui::GetColorU32(ImVec4(0.8f, 0.0f, 0.0f, 0.65f));
+        }
+        ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cell_bg_color);
+        ImGui::Selectable(buffer, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
+        if(cellIndex->selected) {
+          rom_edit.GotoAddrAndHighlight(base, base+ 4);
+          cellIndex->selected = false;
+          console.AddLog("selected row 0x%04X-0x%04X", base, base+ 4);
         }
         cellIndex += sizeof(struct cellState);
+        base+=y->elements*4;
       }
+      base = lastBase+4;
     }
 
     ImGui::EndTable();
