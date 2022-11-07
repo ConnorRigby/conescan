@@ -194,6 +194,9 @@ $(NATIVEFILEDIALOG_DIR)/build/lib/Release/x64/libnfd.a:
 run: $(EXE)
 	./$(EXE)
 
+debug: $(EXE)
+	gdb ./$(EXE)
+
 endif
 
 ifeq ($(TARGET), wasm)
@@ -205,7 +208,7 @@ $(WEB_DIR):
 	mkdir $@
 
 serve: all
-	python serve.py $(WEB_DIR)
+	python3 -m http.server -d $(WEB_DIR)
 
 endif
 

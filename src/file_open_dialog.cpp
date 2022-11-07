@@ -2,16 +2,16 @@
 
 #include "file_open_dialog.h"
 
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 #include "emscripten.h"
 #else
 #include "nfd.h"
 #endif
 
 char* getFileOpenPath(char* defaultPath, bool save)
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 {
-    return "/metadata/lfg2ee.xml";
+    return "/metadata/Mazda/MX5/lfg2ee.xml";
 }
 #else
 {

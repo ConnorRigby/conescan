@@ -19,7 +19,7 @@
 
 #include <errno.h>
 
-#ifdef WASM
+#ifdef __EMSCRIPTEN__
 #include "emscripten.h"
 #endif
 
@@ -39,8 +39,8 @@
 
 #include "uds_request_download.h"
 
-#ifdef WASM
-const char* db_path = "/conescan/conescan.db";
+#ifdef __EMSCRIPTEN__
+const char* db_path = "/conescan.db";
 #else
 const char* db_path = "conescan.db";
 #endif
@@ -279,7 +279,7 @@ io_error:
 void ConeScan::Init(void)
 {
   memset(&definition, 0, sizeof(struct Definition));
-  memset(&definition_parse, 0, sizeof(struct DefinitionParse));
+  memset((void*)&definition_parse, 0, sizeof(struct DefinitionParse));
   definition_parse.console = &console;
   definition_parse.metadataFile = NULL;
   definition_parse.metadataFilePath = NULL;
@@ -446,8 +446,7 @@ void Render2DTable(struct Table* table)
   // printf("table elements %d %d\n", table->elements, x->elements);
   if(ImGui::BeginTable("2D Table", x->elements+1, tableflags)) {
     unsigned long x_axis_address = x->address;
-    unsigned long d_axis_address = table->address;
-    float output = 0.0;
+
     // X header
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 100.0f);
     for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
@@ -505,11 +504,10 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
 
   unsigned long x_axis_address = x->address;
   unsigned long y_axis_address = y->address;
-  unsigned long d_axis_address = table->address;
   unsigned long base = table->address;
-  ImGui::Text("Table Def: data=%04X X=%04X Y=%04X", d_axis_address, x_axis_address, y_axis_address);
+  ImGui::Text("Table Def: data=%04lX X=%04lX Y=%04lX", base, x_axis_address, y_axis_address);
 
-  sprintf(buffer, "[3D] %s ##%04x", table->name, base);
+  sprintf(buffer, "[3D] %s ##%04lx", table->name, base);
   if (ImGui::BeginTable(buffer,  x->elements+1, tableflags)) {
     // build X header
 
@@ -545,7 +543,7 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
       if (cellIndex->selected) {
           rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address+ 4);
           cellIndex->selected = false;
-          console.AddLog("selected row 0x%04X-0x%04X", y_axis_address, y_axis_address+ 4);
+          console.AddLog("selected row 0x%04lX-0x%04lX", y_axis_address, y_axis_address+ 4);
       }
 
       cellIndex += sizeof(struct cellState);
@@ -573,7 +571,7 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
         if(cellIndex->selected) {
           rom_edit.GotoAddrAndHighlight(base, base+ 4);
           cellIndex->selected = false;
-          console.AddLog("selected row 0x%04X-0x%04X", base, base+ 4);
+          console.AddLog("selected row 0x%04lX-0x%04lX", base, base+ 4);
         }
         cellIndex += sizeof(struct cellState);
         base+=y->elements*4;
@@ -587,14 +585,14 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
 
 void RenderTables()
 {
-  char buffer[64] = {0};
+  char buffer[120] = {0};
   if (ImGui::TreeNode("Tables")) {
     for(int i = 0; i < definition.numTables; i++) {
       sprintf(buffer, "%s##%d", definition.tables[i].name, i);
       if(romFile) {
         ImGui::Selectable(buffer, &tableSelect[i]);
       } else {
-        ImGui::TextDisabled(buffer, &tableSelect[i]);
+        ImGui::TextDisabled(buffer);
       }
     }
     ImGui::TreePop();
@@ -602,26 +600,36 @@ void RenderTables()
 
   // TODO: load into categories
   long j = 0;
-  //assert(cellSelect);
   for(int i = 0; i < definition.numTables; i++) {
     if(tableSelect[i]) {
-      ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-      char buf[64];
-      sprintf(buf, "Table Editor %s ##%2d", definition.tables[i].name, i);
-      ImGui::Begin(buf, &tableSelect[i]);
-      if (ImGui::BeginPopupContextItem())
-      {
-          if (ImGui::MenuItem("Close"))
-              tableSelect[i] = false;
-          ImGui::EndPopup();
+      ImGui::SetNextWindowSize(ImVec2(655, 420), ImGuiCond_FirstUseEver);
+      sprintf(buffer, "Table Editor %s##%d", definition.tables[i].name, i);
+      ImGui::Begin(buffer, &tableSelect[i], ImGuiWindowFlags_MenuBar);
+
+      if(ImGui::BeginMenuBar()) {
+        if (ImGui::BeginMenu("Options")) {
+          if(ImGui::MenuItem("Enable Memory Editor", NULL, &rom_edit.Open, true));
+          ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
       }
-      ImGui::Text(definition.tables[i].name);
+
+      // if (ImGui::BeginPopupContextItem())
+      // {
+      //     if (ImGui::MenuItem("Close"))
+      //         tableSelect[i] = false;
+      //     ImGui::EndPopup();
+      // }
+      sprintf(buffer, "%s", definition.tables[i].name);
+      ImGui::Text(buffer);
       assert(definition.tables[i].type);
       if(strcmp(definition.tables[i].type, "3D") == 0) {
         Render3DTable(&definition.tables[i], &cellValues[j]);
         j += definition.tables[i].elements;
         j += definition.tables[i].tables[0].elements;
         j += definition.tables[i].tables[1].elements;
+        sprintf(buffer, "Save##%d", i);
+        ImGui::Button(buffer);
       } else if(strcmp(definition.tables[i].type, "2D") == 0) {
         Render2DTable(&definition.tables[i]);
         j += definition.tables[i].elements;
@@ -703,6 +711,7 @@ void RenderMenu(bool* exit_requested)
 
       for(int i = 0; i < romHistoryCount; i++) {
         assert(romFilePathHistory[i]);
+        // TODO: this should be a ## unique id
         if(ImGui::MenuItem(romFilePathHistory[i], NULL)) {
             closeRomFile();
             if(setRomFilePath(romFilePathHistory[i]))
@@ -712,8 +721,8 @@ void RenderMenu(bool* exit_requested)
 
       ImGui::Separator();
 
-      if(ImGui::MenuItem("Show ImGui Demo", NULL)) show_demo_window = true;
-      if(ImGui::MenuItem("Show Console", NULL)) show_console_window = true;
+      if(ImGui::MenuItem("Show ImGui Demo", NULL, &show_demo_window));
+      if(ImGui::MenuItem("Show Console", NULL, &show_console_window));
 
       ImGui::Separator();
       if (ImGui::MenuItem("Delete History", NULL)) {
@@ -743,16 +752,18 @@ void RenderMenu(bool* exit_requested)
             assert(calID);
             assert(uds_transfer.payload);
 
-            char* defaultFileName = (char*)malloc(strlen(vin) + strlen(calID) + 6);
+            // todo: paths are hard
+            char* defaultFileName = (char*)malloc(strnlen(vin, 18) + strnlen(calID, 20) + 7);
+            assert(defaultFileName);
             char  fullPath[PATH_MAX] = { 0 };
             FILE* outFile = NULL;
 
             assert(defaultFileName);
-            memset(defaultFileName, 0, strlen(vin) + strlen(calID) + 6);
-            strncpy(defaultFileName, vin, strlen(vin));
-            defaultFileName[strlen(vin)] = '-';
-            strncpy(defaultFileName + strlen(vin) + 1, calID, strlen(calID));
-            strncpy(defaultFileName + strlen(vin) + 1 + strlen(calID), ".bin\0", 4);
+            memset(defaultFileName, 0, strnlen(vin, PATH_MAX) + strnlen(calID, 20) + 7);
+            strncpy(defaultFileName, vin, strnlen(vin, 18));
+            defaultFileName[strnlen(vin, 18)] = '-';
+            strncpy(defaultFileName + strnlen(vin, 18) + 1, calID, strlen(calID));
+            strncpy(defaultFileName + strnlen(vin, 18) + 1 + strlen(calID), ".bin", 4);
 
             char* path = getFileOpenPath(NULL, true);
             if (!path) goto cleanup;
@@ -877,7 +888,6 @@ void RenderLiveData()
     return;
     ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
     ImGui::Begin("Live Data Viewer", NULL);
-    const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
     const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
 
     if (ImGui::BeginPopupContextItem())
@@ -920,13 +930,12 @@ void RenderLiveData()
         ImGui::TableNextColumn();
         ImGui::Text("APP1");
         ImGui::Separator();
-        ImGui::Text("%0.2F\%", 0.0);
+        ImGui::Text("%0.2F%%", 0.0);
 
         ImGui::TableNextColumn();
         ImGui::Text("APP2");
         ImGui::Separator();
-        ImGui::Text("%0.2F\%", 0.0);
-
+        ImGui::Text("%0.2F%%", 0.0);
 
         ImGui::TableNextRow(ImGuiTableRowFlags_None, TEXT_BASE_HEIGHT * 5);
         ImGui::TableNextColumn();
@@ -946,8 +955,8 @@ void RenderLiveData()
 
 void RenderRomEdit()
 {
-    //if (rom_edit.Open)
-    if(romFile)
+    if(!romFile) return;
+    if (rom_edit.Open)
         rom_edit.DrawWindow("Rom Memory Editor", romFile, romFileLength);
 
     if (rom_edit.Open == false) {
@@ -1001,6 +1010,10 @@ void ConeScan::Cleanup()
 size_t j2534Initialize()
 {
     console.AddLog("initializing J2534\n");
+#ifdef __EMSCRIPTEN__
+    console.AddLog("J2534 Does not work in the browser currently");
+    return 1;
+#endif
     j2534.getDLLName(dllName);
 #ifdef DEBUG
     j2534.debug(true);
