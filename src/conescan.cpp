@@ -423,10 +423,12 @@ void RenderDefinitionInfo()
 
 void RenderScalings()
 {
+  char buffer[64] = {0};
   ImVec4 valueColor(0.5f, 0.5f, 0.5f, 1.0f);
   if (ImGui::TreeNode("Scalings")) {
     for(int i = 0; i < definition.numScalings; i++) {
-      ImGui::TextColored(valueColor, definition.scalings[i].name);
+      sprintf(buffer, "%s##%d", definition.scalings[i].name, i);
+      ImGui::TextColored(valueColor, buffer);
     }
     ImGui::TreePop();
   }
@@ -507,7 +509,7 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
   unsigned long base = table->address;
   ImGui::Text("Table Def: data=%04X X=%04X Y=%04X", d_axis_address, x_axis_address, y_axis_address);
 
-  sprintf(buffer, "[3D] %s", table->name);
+  sprintf(buffer, "[3D] %s ##%04x", table->name, base);
   if (ImGui::BeginTable(buffer,  x->elements+1, tableflags)) {
     // build X header
 
@@ -585,12 +587,14 @@ void Render3DTable(struct Table* table, struct cellState* cellIndex)
 
 void RenderTables()
 {
+  char buffer[64] = {0};
   if (ImGui::TreeNode("Tables")) {
     for(int i = 0; i < definition.numTables; i++) {
+      sprintf(buffer, "%s##%d", definition.tables[i].name, i);
       if(romFile) {
-        ImGui::Selectable(definition.tables[i].name, &tableSelect[i]);
+        ImGui::Selectable(buffer, &tableSelect[i]);
       } else {
-        ImGui::TextDisabled(definition.tables[i].name);
+        ImGui::TextDisabled(buffer, &tableSelect[i]);
       }
     }
     ImGui::TreePop();
@@ -603,7 +607,7 @@ void RenderTables()
     if(tableSelect[i]) {
       ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
       char buf[64];
-      sprintf(buf, "Table Editor #%2d", i);
+      sprintf(buf, "Table Editor %s ##%2d", definition.tables[i].name, i);
       ImGui::Begin(buf, &tableSelect[i]);
       if (ImGui::BeginPopupContextItem())
       {
@@ -870,7 +874,7 @@ void RenderConnection()
 
 void RenderLiveData()
 {
-    //return;
+    return;
     ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
     ImGui::Begin("Live Data Viewer", NULL);
     const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
