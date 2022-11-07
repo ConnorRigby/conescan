@@ -108,6 +108,29 @@ bool* tableSelect = NULL;
 bool* cellSelect = NULL;
 int numCells = 0;
 
+union cellValue {
+    float    f32;
+    uint32_t u32;
+    uint16_t u16;
+    uint8_t  u8;
+};
+
+enum cellType {
+    CELL_F32,
+    CELL_U32,
+    CELL_U16,
+    CELL_U8
+};
+
+struct cellState {
+    union cellValue value;
+    enum  cellType  type;
+    bool            selected;
+};
+
+/* Holds Every editor value for the editor */
+struct cellState* cellValues = NULL;
+
 // All path history buffers will be at max this long
 int pathHistoryMax = 5;
 
@@ -166,6 +189,10 @@ void initSelects()
     cellSelect = (bool*)malloc(sizeof(bool) * numCells);
     assert(cellSelect);
     memset(cellSelect, 0, sizeof(bool) * numCells);
+
+    cellValues = (struct cellState*)malloc(sizeof(struct cellState) * numCells);
+    assert(cellValues);
+    memset(cellValues, 0, sizeof(struct cellState) * numCells);
 }
 
 void deinitSelects()
@@ -177,6 +204,10 @@ void deinitSelects()
     if (cellSelect) {
         free(cellSelect);
         cellSelect = NULL;
+    }
+    if (cellValues) {
+        free(cellValues);
+        cellValues = NULL;
     }
 }
 
@@ -433,7 +464,16 @@ void Render2DTable(struct Table* table)
   }
 }
 
-void Render3DTable(struct Table* table, bool* cellSelectIndex) 
+void tableCopyF32(float* value, unsigned char* data, unsigned long address)
+{
+    assert(value); assert(data);
+    *((unsigned char*)(value) + 3) = data[address];
+    *((unsigned char*)(value) + 2) = data[address + 1];
+    *((unsigned char*)(value) + 1) = data[address + 2];
+    *((unsigned char*)(value) + 0) = data[address + 3];
+}
+
+void Render3DTable(struct Table* table, struct cellState* cellIndex) 
 {
   assert(romFile);
   assert(table);
@@ -451,24 +491,21 @@ void Render3DTable(struct Table* table, bool* cellSelectIndex)
     unsigned long x_axis_address = x->address;
     unsigned long y_axis_address = y->address;
     unsigned long d_axis_address = table->address;
-    float output = 0.0;
+    
     // X header
     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-    cellSelectIndex += sizeof(bool);
+    cellIndex += sizeof(struct cellState);
     for(int xi = 1; xi < x->elements+1; xi++,x_axis_address+=4) {
       char buffer[50] = {0};
-      float output = 0.0;
-
-      *((unsigned char*)(&output) + 3) = romFile[x_axis_address];
-      *((unsigned char*)(&output) + 2) = romFile[x_axis_address+1];
-      *((unsigned char*)(&output) + 1) = romFile[x_axis_address+2];
-      *((unsigned char*)(&output) + 0) = romFile[x_axis_address+3];
+      tableCopyF32(&cellIndex->value.f32, romFile, x_axis_address);
+      
       assert(x->Scaling);
-      sprintf(buffer, x->Scaling->format, output);
+      sprintf(buffer, x->Scaling->format, cellIndex->value.f32);
 
-      ImGui::Text(buffer);
+      //ImGui::Text(buffer);
+      //ImGui::InputFloat(buffer, &cellIndex->value.f32);
       ImGui::TableSetupColumn(buffer, ImGuiTableColumnFlags_WidthFixed, 50.0f);
-      cellSelectIndex += sizeof(bool);
+      cellIndex += sizeof(struct cellState);
     }
     ImGui::TableHeadersRow();
     
@@ -479,40 +516,40 @@ void Render3DTable(struct Table* table, bool* cellSelectIndex)
       ImGui::TableSetColumnIndex(0);
       ImU32 row_bg_color = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 0.65f));
       ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, row_bg_color);
-      *((unsigned char*)(&output) + 3) = romFile[y_axis_address];
-      *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
-      *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
-      *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
+      tableCopyF32(&cellIndex->value.f32, romFile, y_axis_address);
       char buf[32];
-      sprintf(buf, y->Scaling->format, output);
+      sprintf(buf, y->Scaling->format, cellIndex->value.f32);
       ImGui::PushID(yi);
-      ImGui::Selectable(buf, cellSelectIndex, 0, ImVec2(0.0, 0.0));
-      if (*cellSelectIndex) {
+      ImGui::Selectable(buf, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
+      //ImGui::InputFloat("", &output);
+      //ImGui::InputFloat(buf, &output);
+
+      if (cellIndex->selected) {
           //rom_edit.HighlightColor = ImGui
           rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
-          *cellSelectIndex = false;
+          //cellIndex->selected = false;
       }
       ImGui::PopID();
       y_axis_address+=4;
+      cellIndex += sizeof(struct cellState);
 
       for(int xi = 1, g=0, x_axis_address=x->address; xi < x->elements+1; xi++,g++,x_axis_address+=4,d_axis_address+=4) {
         ImGui::TableSetColumnIndex(xi);
-        *((unsigned char*)(&output) + 3) = romFile[y_axis_address];
-        *((unsigned char*)(&output) + 2) = romFile[y_axis_address+1];
-        *((unsigned char*)(&output) + 1) = romFile[y_axis_address+2];
-        *((unsigned char*)(&output) + 0) = romFile[y_axis_address+3];
+        tableCopyF32(&cellIndex->value.f32, romFile, y_axis_address);
         //ImGui::Text(y->Scaling->format, output);
         assert(y->Scaling);
         char buf[32];
-        sprintf(buf, y->Scaling->format, output);
+        sprintf(buf, "###%d%d", yi, xi);
+        //sprintf(buf, y->Scaling->format, cellIndex->value.f32);
         ImGui::PushID(xi);
-        ImGui::Selectable(buf,cellSelectIndex, 0, ImVec2(0.0, 0.0));
+        //ImGui::Selectable(buf, &cellIndex->selected, 0, ImVec2(0.0, 0.0));
+        ImGui::InputFloat(buf, &cellIndex->value.f32);
         ImGui::PopID();
-        if (*cellSelectIndex) {
-            rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
-            *cellSelectIndex = false;
+        if (cellIndex->selected) {
+            //rom_edit.GotoAddrAndHighlight(y_axis_address, y_axis_address + 3);
+            //cellIndex->selected = false;
         }
-        cellSelectIndex += sizeof(bool);
+        cellIndex += sizeof(struct cellState);
       }
     }
 
@@ -551,7 +588,7 @@ void RenderTables()
       ImGui::Text(definition.tables[i].name);
       assert(definition.tables[i].type);
       if(strcmp(definition.tables[i].type, "3D") == 0) {
-        Render3DTable(&definition.tables[i], &cellSelect[j]);
+        Render3DTable(&definition.tables[i], &cellValues[j]);
         j += definition.tables[i].elements;
         j += definition.tables[i].tables[0].elements;
         j += definition.tables[i].tables[1].elements;
@@ -805,6 +842,78 @@ void RenderConnection()
   ImGui::End();
 }
 
+void RenderLiveData()
+{
+    //return;
+    ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Live Data Viewer", NULL);
+    const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
+    const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
+
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Close")) {
+            assert(false); // fixme
+        }
+        ImGui::EndPopup();
+    }
+    ImGuiTableFlags flags = //ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_SizingFixedSame | 
+                            //ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_SizingStretchSame | 
+                            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoHostExtendX;
+
+    if (ImGui::BeginTable("Data", 2, flags)) {
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, TEXT_BASE_HEIGHT * 5);
+        ImGui::TableNextColumn();
+
+        static float value;
+        ImGui::InputFloat("test", &value);
+        ImGui::TableNextColumn();
+        ImGui::Text("test");
+        ImGui::EndTable();
+    }
+    ImGui::End();
+    return;
+    if (ImGui::BeginTable("Data", 2, flags)) {
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, TEXT_BASE_HEIGHT * 5);
+        
+        ImGui::TableNextColumn();
+        ImGui::Text("RPM");
+        ImGui::Separator();
+        ImGui::Text("%d RPM", 0);
+
+        ImGui::TableNextColumn();
+        ImGui::Text("MAF");
+        ImGui::Separator();
+        ImGui::Text("%0.F G/s", 0.0);
+
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, TEXT_BASE_HEIGHT * 5);
+        ImGui::TableNextColumn();
+        ImGui::Text("APP1");
+        ImGui::Separator();
+        ImGui::Text("%0.2F\%", 0.0);
+
+        ImGui::TableNextColumn();
+        ImGui::Text("APP2");
+        ImGui::Separator();
+        ImGui::Text("%0.2F\%", 0.0);
+
+
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, TEXT_BASE_HEIGHT * 5);
+        ImGui::TableNextColumn();
+        ImGui::Text("Lambda");
+        ImGui::Separator();
+        ImGui::Text("%0.2F:1", 0.0);
+
+        ImGui::TableNextColumn();
+        ImGui::Text("CLT");
+        ImGui::Separator();
+        ImGui::Text("%0.2FC", 0.0);
+
+        ImGui::EndTable();
+    }
+    ImGui::End();
+}
+
 void RenderRomEdit()
 {
     //if (rom_edit.Open)
@@ -834,6 +943,7 @@ void ConeScan::RenderUI(bool* exit_requested)
   ImGui::End();
 
   RenderConnection();
+  RenderLiveData();
   RenderRomEdit();
 }
 
