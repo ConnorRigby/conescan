@@ -23,6 +23,12 @@
 #include "emscripten.h"
 #endif
 
+extern "C" {
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+}
+
 #include "conescan.h"
 #include "conescan_db.h"
 #include "history.h"
@@ -141,6 +147,11 @@ int metadataHistoryCount = 0;
 // holds up to [pathHistoryMax] strings
 char **romFilePathHistory;
 int romHistoryCount = 0;
+
+lua_State *L = NULL;
+
+extern const char * RunString(const char* szLua);
+extern void LoadImguiBindings();
 
 void addMetadataFileToHistory(char* metadataFilePath)
 {
@@ -278,6 +289,7 @@ io_error:
 
 void ConeScan::Init(void)
 {
+  LoadImguiBindings();
   memset(&definition, 0, sizeof(struct Definition));
   memset((void*)&definition_parse, 0, sizeof(struct DefinitionParse));
   definition_parse.console = &console;
@@ -338,6 +350,10 @@ void ConeScan::Init(void)
   rom_edit.OptShowDataPreview = true;
   rom_edit.PreviewDataType = ImGuiDataType_Float;
   rom_edit.PreviewEndianess = 1;
+
+  L = luaL_newstate();
+  assert(L);
+  luaL_openlibs(L);
 }
 
 void RenderDefinitionInfo()
@@ -971,6 +987,8 @@ void ConeScan::RenderUI(bool* exit_requested)
 
   if(show_demo_window)
     ImGui::ShowDemoWindow(&show_demo_window);
+
+  RunString("ret = imgui.RadioButton(\"String goes here\", isActive)");
 
   // title menu bar
   RenderMenu(exit_requested);

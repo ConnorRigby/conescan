@@ -11,3 +11,6 @@
 [submodule "lib/rx8-ecu-dump"]
 	path = lib/rx8-ecu-dump
 	url = git@github.com:ConnorRigby/rx8-ecu-dump.git
+[submodule "lib/lua"]
+	path = lib/lua
+	url = git@github.com:lua/lua.git

@@ -21,6 +21,7 @@ IMGUI_DIR = lib/imgui
 TINYXML2_DIR = lib/tinyxml2
 NATIVEFILEDIALOG_DIR = lib/nativefiledialog
 SQLITE3_DIR = lib/sqlite3
+LUA_DIR = lib/lua
 RX8_ECU_DUMP_DIR = lib/rx8-ecu-dump
 J2534_DIR = $(RX8_ECU_DUMP_DIR)/J2534
 
@@ -28,6 +29,42 @@ SOURCES = src/main.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_demo.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
 SOURCES += $(TINYXML2_DIR)/tinyxml2.cpp
 SOURCES += $(SQLITE3_DIR)/sqlite3.c
+SOURCES += $(LUA_DIR)/
+SOURCES += $(LUA_DIR)/lib/lua/lctype.c
+SOURCES += $(LUA_DIR)/lib/lua/ltm.c
+SOURCES += $(LUA_DIR)/lib/lua/ldo.c
+SOURCES += $(LUA_DIR)/lib/lua/lzio.c
+SOURCES += $(LUA_DIR)/lib/lua/lbaselib.c
+SOURCES += $(LUA_DIR)/lib/lua/lmem.c
+SOURCES += $(LUA_DIR)/lib/lua/lgc.c
+SOURCES += $(LUA_DIR)/lib/lua/lundump.c
+#SOURCES += $(LUA_DIR)/lib/lua/lua.c interpreter can't be bundled
+SOURCES += $(LUA_DIR)/lib/lua/lmathlib.c
+SOURCES += $(LUA_DIR)/lib/lua/lfunc.c
+SOURCES += $(LUA_DIR)/lib/lua/lutf8lib.c
+SOURCES += $(LUA_DIR)/lib/lua/liolib.c
+SOURCES += $(LUA_DIR)/lib/lua/ldebug.c
+SOURCES += $(LUA_DIR)/lib/lua/lapi.c
+SOURCES += $(LUA_DIR)/lib/lua/ldump.c
+SOURCES += $(LUA_DIR)/lib/lua/lparser.c
+SOURCES += $(LUA_DIR)/lib/lua/ldblib.c
+SOURCES += $(LUA_DIR)/lib/lua/lauxlib.c
+SOURCES += $(LUA_DIR)/lib/lua/lcorolib.c
+SOURCES += $(LUA_DIR)/lib/lua/lopcodes.c
+SOURCES += $(LUA_DIR)/lib/lua/loslib.c
+SOURCES += $(LUA_DIR)/lib/lua/lstate.c
+SOURCES += $(LUA_DIR)/lib/lua/lvm.c
+SOURCES += $(LUA_DIR)/lib/lua/loadlib.c
+SOURCES += $(LUA_DIR)/lib/lua/linit.c
+# SOURCES += $(LUA_DIR)/lib/lua/onelua.c # onelua contains all the other files
+SOURCES += $(LUA_DIR)/lib/lua/llex.c
+SOURCES += $(LUA_DIR)/lib/lua/lstring.c
+SOURCES += $(LUA_DIR)/lib/lua/ltable.c
+SOURCES += $(LUA_DIR)/lib/lua/lobject.c
+SOURCES += $(LUA_DIR)/lib/lua/lstrlib.c
+SOURCES += $(LUA_DIR)/lib/lua/ltablib.c
+SOURCES += $(LUA_DIR)/lib/lua/lcode.c
+SOURCES += $(LUA_DIR)/lib/lua/ltests.c
 SOURCES += $(RX8_ECU_DUMP_DIR)/src/util.cpp
 SOURCES += $(RX8_ECU_DUMP_DIR)/src/librx8.cpp
 SOURCES += $(RX8_ECU_DUMP_DIR)/src/UDS.cpp
@@ -74,6 +111,7 @@ LDFLAGS += --shell-file $(EMSCRIPTEN_EXTRA_DIR)/shell_minimal.html $(EMS)
 endif
 
 OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
+OBJS += lib/imgui_lua_bindings/imgui_lua_bindings.o
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
@@ -81,6 +119,7 @@ CXXFLAGS =  -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends
 CXXFLAGS += -I$(TINYXML2_DIR)
 CXXFLAGS += -I$(NATIVEFILEDIALOG_DIR)/src/include
 CXXFLAGS += -I$(SQLITE3_DIR)
+CXXFLAGS += -I$(LUA_DIR)
 CXXFLAGS += -I$(RX8_ECU_DUMP_DIR)/src
 CXXFLAGS += -I$(J2534_DIR)
 CXXFLAGS += -g # TODO: remove in release builds
@@ -164,6 +203,9 @@ endif
 
 %.o:$(SQLITE3_DIR)/%.c
 	$(CC) $(CXXFLAGS) -c -o $@ $<
+
+%.o:$(LUA_DIR)/%.c
+	$(CC) $(CXXFLAGS) -DLUA_COMPAT_5_3 -DLUA_USE_LINUX -c -o $@ $<
 
 %.o:$(IMGUI_DIR)/%.cpp
 	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
