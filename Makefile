@@ -112,6 +112,7 @@ endif
 
 OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 OBJS += lib/imgui_lua_bindings/imgui_lua_bindings.o
+OBJS += lib/ImGuiColorTextEdit/TextEditor.o
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL
 
@@ -198,8 +199,17 @@ endif
 ## BUILD RULES
 ##---------------------------------------------------------------------
 
+all: $(EXE)
+	@echo Build complete for $(ECHO_MESSAGE)
+
+lib/imgui_lua_bindings/imgui_lua_bindings.o: lib/imgui_lua_bindings/imgui_lua_bindings.cpp
+	$(CXX) -Ilib/imgui -Ilib/lua -fpermissive -c lib/imgui_lua_bindings/imgui_lua_bindings.cpp -o lib/imgui_lua_bindings/imgui_lua_bindings.o
+
+lib/ImGuiColorTextEdit/TextEditor.o: lib/ImGuiColorTextEdit/TextEditor.cpp
+	$(CXX) -Ilib/imgui -c lib/ImGuiColorTextEdit/TextEditor.cpp -o lib/ImGuiColorTextEdit/TextEditor.o
+
 %.o:src/%.cpp
-	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++11 $(CXXFLAGS) -Ilib/ImGuiColorTextEdit/ -c -o $@ $<
 
 %.o:$(SQLITE3_DIR)/%.c
 	$(CC) $(CXXFLAGS) -c -o $@ $<
@@ -221,9 +231,6 @@ endif
 
 %.o:$(J2534_DIR)/%.cpp
 	$(CXX) -std=c++11 $(CXXFLAGS) -c -o $@ $<
-
-all: $(EXE)
-	@echo Build complete for $(ECHO_MESSAGE)
 
 ifeq ($(TARGET), x86_64)
 

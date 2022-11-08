@@ -45,6 +45,8 @@ extern "C" {
 
 #include "uds_request_download.h"
 
+#include "TextEditor.h"
+#include <fstream>
 #ifdef __EMSCRIPTEN__
 const char* db_path = "/conescan.db";
 #else
@@ -148,10 +150,14 @@ int metadataHistoryCount = 0;
 char **romFilePathHistory;
 int romHistoryCount = 0;
 
-lua_State *L = NULL;
+extern lua_State* lState;
+const char* run_string;
 
 extern const char * RunString(const char* szLua);
 extern void LoadImguiBindings();
+
+TextEditor editor;
+static const char* fileToEdit = "test.lua";
 
 void addMetadataFileToHistory(char* metadataFilePath)
 {
@@ -289,7 +295,6 @@ io_error:
 
 void ConeScan::Init(void)
 {
-  LoadImguiBindings();
   memset(&definition, 0, sizeof(struct Definition));
   memset((void*)&definition_parse, 0, sizeof(struct DefinitionParse));
   definition_parse.console = &console;
@@ -351,9 +356,62 @@ void ConeScan::Init(void)
   rom_edit.PreviewDataType = ImGuiDataType_Float;
   rom_edit.PreviewEndianess = 1;
 
-  L = luaL_newstate();
-  assert(L);
-  luaL_openlibs(L);
+  lState = luaL_newstate();
+  assert(lState);
+  luaL_openlibs(lState);
+  LoadImguiBindings();
+
+
+  ///////////////////////////////////////////////////////////////////////
+	// TEXT EDITOR SAMPLE
+	auto lang = TextEditor::LanguageDefinition::Lua();
+
+	// set your own known preprocessor symbols...
+	static const char* ppnames[] = { };
+	// ... and their corresponding values
+	static const char* ppvalues[] = { };
+
+	for (int i = 0; i < sizeof(ppnames) / sizeof(ppnames[0]); ++i)
+	{
+		TextEditor::Identifier id;
+		id.mDeclaration = ppvalues[i];
+		lang.mPreprocIdentifiers.insert(std::make_pair(std::string(ppnames[i]), id));
+	}
+
+	// set your own identifiers
+	static const char* identifiers[] = { };
+	static const char* idecls[] = { };
+	for (int i = 0; i < sizeof(identifiers) / sizeof(identifiers[0]); ++i)
+	{
+		TextEditor::Identifier id;
+		id.mDeclaration = std::string(idecls[i]);
+		lang.mIdentifiers.insert(std::make_pair(std::string(identifiers[i]), id));
+	}
+	editor.SetLanguageDefinition(lang);
+	//editor.SetPalette(TextEditor::GetLightPalette());
+
+	// error markers
+	TextEditor::ErrorMarkers markers;
+	// markers.insert(std::make_pair<int, std::string>(6, "Example error here:\nInclude file not found: \"TextEditor.h\""));
+	// markers.insert(std::make_pair<int, std::string>(41, "Another example error"));
+	editor.SetErrorMarkers(markers);
+
+	// "breakpoint" markers
+	//TextEditor::Breakpoints bpts;
+	//bpts.insert(24);
+	//bpts.insert(47);
+	//editor.SetBreakpoints(bpts);
+
+
+	{
+		std::ifstream t(fileToEdit);
+		if (t.good())
+		{
+			std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+			editor.SetText(str);
+		}
+	}
+
 }
 
 void RenderDefinitionInfo()
@@ -980,6 +1038,86 @@ void RenderRomEdit()
     }
 }
 
+void RenderEditor()
+{
+		auto cpos = editor.GetCursorPosition();
+		ImGui::Begin("Text Editor Demo", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar);
+		ImGui::SetWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+		if (ImGui::BeginMenuBar())
+		{
+			if (ImGui::BeginMenu("File"))
+			{
+				if (ImGui::MenuItem("Save"))
+				{
+          if((void*)run_string) {
+            free((void*)run_string);
+            run_string = (const char*)NULL;
+          }
+					std::string text = editor.GetText();
+          const char* tmp = text.c_str();
+          run_string = (const char*)malloc(sizeof(char) * text.length() + 1);
+          memset((void*)run_string, 0, sizeof(char) * text.length() + 1);
+          memcpy((void*)run_string, tmp, sizeof(char) * text.length());
+
+					/// save text....
+				}
+				if (ImGui::MenuItem("Quit", "Alt-F4"))
+					return;
+				ImGui::EndMenu();
+			}
+			if (ImGui::BeginMenu("Edit"))
+			{
+				bool ro = editor.IsReadOnly();
+				if (ImGui::MenuItem("Read-only mode", nullptr, &ro))
+					editor.SetReadOnly(ro);
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, !ro && editor.CanUndo()))
+					editor.Undo();
+				if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, !ro && editor.CanRedo()))
+					editor.Redo();
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, editor.HasSelection()))
+					editor.Copy();
+				if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, !ro && editor.HasSelection()))
+					editor.Cut();
+				if (ImGui::MenuItem("Delete", "Del", nullptr, !ro && editor.HasSelection()))
+					editor.Delete();
+				if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, !ro && ImGui::GetClipboardText() != nullptr))
+					editor.Paste();
+
+				ImGui::Separator();
+
+				if (ImGui::MenuItem("Select all", nullptr, nullptr))
+					editor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(editor.GetTotalLines(), 0));
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem("Dark palette"))
+					editor.SetPalette(TextEditor::GetDarkPalette());
+				if (ImGui::MenuItem("Light palette"))
+					editor.SetPalette(TextEditor::GetLightPalette());
+				if (ImGui::MenuItem("Retro blue palette"))
+					editor.SetPalette(TextEditor::GetRetroBluePalette());
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenuBar();
+		}
+
+		ImGui::Text("%6d/%-6d %6d lines  | %s | %s | %s | %s", cpos.mLine + 1, cpos.mColumn + 1, editor.GetTotalLines(),
+			editor.IsOverwrite() ? "Ovr" : "Ins",
+			editor.CanUndo() ? "*" : " ",
+			editor.GetLanguageDefinition().mName.c_str(), fileToEdit);
+
+		editor.Render("TextEditor");
+		ImGui::End();
+}
+
 void ConeScan::RenderUI(bool* exit_requested)
 {
   if(show_console_window)
@@ -988,7 +1126,10 @@ void ConeScan::RenderUI(bool* exit_requested)
   if(show_demo_window)
     ImGui::ShowDemoWindow(&show_demo_window);
 
-  RunString("ret = imgui.RadioButton(\"String goes here\", isActive)");
+  if(run_string) {
+    const char* errorString = RunString(run_string);
+    if(errorString) console.AddLog(errorString);
+  }
 
   // title menu bar
   RenderMenu(exit_requested);
@@ -1002,6 +1143,8 @@ void ConeScan::RenderUI(bool* exit_requested)
   RenderConnection();
   RenderLiveData();
   RenderRomEdit();
+
+  RenderEditor();
 }
 
 void ConeScan::Cleanup()
